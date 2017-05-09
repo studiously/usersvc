@@ -12,6 +12,7 @@ import (
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
+	"github.com/Sirupsen/logrus"
 )
 
 var (
@@ -59,6 +60,7 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
 	var req createUserRequest
 	if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
+		logrus.WithError(e).Info("whoops")
 		return nil, e
 	}
 	return req, nil
