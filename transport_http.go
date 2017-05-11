@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
-
 	"github.com/Studiously/usersvc/ddl"
 	"github.com/Studiously/usersvc/templates"
-	"github.com/go-kit/kit/log"
+	lg"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
+	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
-	"github.com/Sirupsen/logrus"
+	"github.com/google/uuid"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 
 // MakeHTTPHandler mounts all of the service endpoints into an http.Handler.
 // Useful in a usersvc server.
-func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
+func MakeHTTPHandler(s Service, logger lg.Logger) http.Handler {
 	r := mux.NewRouter()
 	e := MakeServerEndpoints(s)
 
@@ -31,13 +31,13 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 		httptransport.ServerErrorLogger(logger),
 		httptransport.ServerErrorEncoder(encodeError),
 	}
-
-	r.Methods("POST").Path("/signup").Handler(httptransport.NewServer(
+	var CSRF = csrf.Protect([]byte("aNdRgUkXp2r5u8x/A?D(G+KbPeShVmYq"), csrf.Secure(false))
+	r.Methods("POST").Path("/signup").Handler(CSRF(httptransport.NewServer(
 		e.CreateUserEndpoint,
 		decodeCreateUserRequest,
 		encodeResponse,
 		options...
-	))
+	)))
 	r.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(
 		e.GetUserEndpoint,
 		decodeGetUserRequest,
@@ -50,20 +50,31 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 		encodeResponse,
 		options...
 	))
-	r.Methods("GET").Path("/authenticate").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Methods("GET").Path("/authenticate").Handler(CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		challenge := r.FormValue("challenge")
-		template.ExecuteTemplate(w, "authenticate.html", challenge)
-	})
+		log.Println("Token: " + csrf.Token(r))
+		template.ExecuteTemplate(w, "authenticate.html", map[string]interface{}{
+			"challenge":      challenge,
+			csrf.TemplateTag: csrf.TemplateField(r),
+			"csrfToken":      csrf.Token(r),
+		})
+	})))
 	return r
 }
 
 func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
-	var req createUserRequest
-	if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
-		logrus.WithError(e).Info("whoops")
-		return nil, e
+	//var req createUserRequest
+	//json.NewDecoder(r.Body).Decode(&req)
+	//return req, err
+	e := r.ParseForm()
+	if e != nil {
+		return createUserRequest{}, e
 	}
-	return req, nil
+	return createUserRequest{
+		Name:     r.FormValue("name"),
+		Email:    r.FormValue("email"),
+		Password: r.FormValue("password"),
+	}, nil
 }
 
 func decodeGetUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
@@ -72,7 +83,7 @@ func decodeGetUserRequest(_ context.Context, r *http.Request) (request interface
 	if !ok {
 		return nil, ErrBadRouting
 	}
-	id, err := uuid.FromString(sid)
+	id, err := uuid.Parse(sid)
 	return getUserRequest{Id: id}, err
 }
 
@@ -82,7 +93,7 @@ func decodeGetProfileRequest(_ context.Context, r *http.Request) (request interf
 	if !ok {
 		return nil, ErrBadRouting
 	}
-	id, err := uuid.FromString(sid)
+	id, err := uuid.Parse(sid)
 	return getProfileRequest{UserId: id}, err
 }
 
@@ -122,6 +133,8 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 func codeFrom(err error) int {
 	switch err {
+	case ErrUserExists:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}

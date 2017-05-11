@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/Studiously/usersvc"
 	"github.com/Studiously/usersvc/ddl"
 	"github.com/go-kit/kit/log"
+	_"github.com/lib/pq"
 	"github.com/rubenv/sql-migrate"
-	"github.com/Studiously/usersvc"
 )
 
 const (
@@ -26,24 +27,10 @@ func main() {
 
 	var (
 		httpAddr = flag.String("http.addr", ":8080", "HTTP listen address")
+		mode     = flag.String("mode", "inmem", "Storage mode (inmem or persist)")
 	)
 	flag.Parse()
 
-	//var driver = os.Getenv("DATABASE_DRIVER")
-	//var config = os.Getenv("DATABASE_CONFIG")
-	//
-	//db, err := sql.Open(driver, config)
-	//if err != nil {
-	//	logrus.Fatalln("database connection failed", err)
-	//}
-	//if err := pingDatabase(db); err != nil {
-	//	logrus.Errorln(err)
-	//	logrus.Fatalln("database ping attempts failed")
-	//}
-	//if err := setupDatabase(driver, db); err != nil {
-	//	logrus.Errorln(err)
-	//	logrus.Fatalln("migration failed")
-	//}
 	var logger log.Logger
 	{
 		logger = log.NewLogfmtLogger(os.Stderr)
@@ -53,7 +40,32 @@ func main() {
 
 	var s usersvc.Service
 	{
-		s = usersvc.NewInmemService()
+		switch (*mode) {
+
+		case "persist":
+			var driver = os.Getenv("DATABASE_DRIVER")
+			var config = os.Getenv("DATABASE_CONFIG")
+
+			db, err := sql.Open(driver, config)
+			if err != nil {
+				logrus.Fatalln("database connection failed", err)
+			}
+			if err := pingDatabase(db); err != nil {
+				logrus.Errorln(err)
+				logrus.Fatalln("database ping attempts failed")
+			}
+			if err := setupDatabase(driver, db); err != nil {
+				logrus.Errorln(err)
+				logrus.Fatalln("migration failed")
+			}
+
+			s = usersvc.NewPersistentService(db)
+		case "inmem":
+			fallthrough
+		default:
+			s = usersvc.NewInmemService()
+			break
+		}
 	}
 
 	var h http.Handler

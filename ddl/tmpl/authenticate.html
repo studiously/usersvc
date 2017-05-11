@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name=“gorilla.csrf.Token” content=“{{.csrfToken}}”>
     <title>Log in | Studiously</title>
     <style>
         @import url(https://fonts.googleapis.com/css?family=Roboto:300);
@@ -21,6 +22,10 @@
             padding: 45px;
             text-align: center;
             box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+        }
+
+        form .error {
+            color: #ff0000 !important;
         }
 
         .form input {
@@ -127,18 +132,22 @@
 <div id="app" class="login-page">
     <div class="form">
         <!--<h3 align="left">Log in</h3>-->
-        <form id="register" class="register-form">
+        <form id="register" class="register-form" action="/signup" method="POST">
             <h1 align="left">Create an account</h1>
+            <p align="left" class="error"></p>
             <input name="name" type="text" placeholder="name"/>
             <input name="password" type="password" placeholder="password"/>
-            <input name="email" type="text" placeholder="email address"/>
+            <input name="email" type="email" placeholder="email address"/>
+            {{ .csrfField }}
             <button type="submit">create</button>
             <p class="message">Already registered? <a href="#">Sign In</a></p>
         </form>
-        <form id="signin" class="login-form" action="/login?challenge={{.}}" method="POST">
+        <form id="signin" class="login-form" action="/login?challenge={{ .challenge }}" method="POST">
             <h1 align="left">Sign in</h1>
-            <input id="email" type="text" placeholder="email"/>
-            <input id="password" type="password" placeholder="password"/>
+            <p align="left" class="error"></p>
+            <input name="email" type="email" placeholder="email"/>
+            <input name="password" type="password" placeholder="password"/>
+            {{ .csrfField }}
             <button type="submit">login</button>
             <p class="message">Not registered? <a href="#">Create an account</a></p>
         </form>
@@ -146,42 +155,74 @@
 </div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-<!--<script src="http://malsup.github.com/jquery.form.js"></script>-->
+
 <script>
     $(document).ready(function () {
 
         $('.message a').click(function () {
-            $('form').animate({height: "toggle", opacity: "toggle"}, "slow");
+            $('form').animate({height: "toggle", opacity: "toggle"}, "slow")
         });
 
-//        $('#register')
-//            .ajaxForm({
-//                url: '/signup',
-//                type: "POST",
-//                dataType: 'json',
-//                success: function (response) {
-//                    alert("The server says: " + response);
-//                }
-//            });
-        $('#register').submit(function (event) {
-            var formData = {
-                'name': $('input[name=name]').val(),
-                'password': $('input[name=password]').val(),
-                'email': $('input[name=email]').val()
-            };
-            console.log(JSON.stringify(formData))
-            $.ajax({
-                type: 'POST', // define the type of HTTP verb we want to use (POST for our form)
-                url: '/signup', // the url where we want to POST
-                data: formData, // our data object
-                dataType: 'json', // what type of data do we expect back from the server
-                encode: true
-            }).done(function (response) {
-                alert(response)
+        var register = $("#register")
+        register
+            .submit(function (event) {
+                event.preventDefault()
+                $.ajax({
+                    method: 'POST',
+                    url: '/signup',
+                    processData: false,
+                    contentType: false,
+                    data: new FormData(register[0]),
+//                    data: new FormData({
+//                        name: register.find("input[name='name']").val(),
+//                        password: register.find("input[name='password']"),
+//                        email: register.find("input[name='email']"),
+//                    }),
+                    headers: {
+                        "X-CSRF-Token": $("meta[name='gorilla.csrf.Token']").attr("content")
+                    }
+                }).done(function (response) {
+                    register.find(".error").val("")
+                    $("#signin").find("input[name='email']").val(register.find("input[name='email']").val())
+                    $('form').animate({height: "toggle", opacity: "toggle"}, "slow")
+                }).fail(function (xhr, status) {
+                    var response = $.parseJSON(xhr.responseText)
+                    console.log(response)
+                    register.find(".error").text(response.error)
+                })
             });
-            event.preventDefault();
-            event.stopPropagation();
-        });
+
+//        $("form[name='register']").validate({
+//            // Specify validation rules
+//            rules: {
+//                // The key name on the left side is the name attribute
+//                // of an input field. Validation rules are defined
+//                // on the right side
+//                name: "required",
+//                email: {
+//                    required: true,
+//                    // Specify that email should be validated
+//                    // by the built-in "email" rule
+//                    email: true
+//                },
+//                password: {
+//                    required: true,
+//                    minlength: 5
+//                }
+//            },
+//            // Specify validation error messages
+//            messages: {
+//                name: "Please enter your name.",
+//                password: {
+//                    required: "Please provide a password.",
+//                    minlength: "Your password must be at least 5 characters long."
+//                },
+//                email: "Please enter a valid email address."
+//            },
+//            submitHandler: function (form) {
+//                $(form).ajaxSubmit();
+//            }
+//        });
     })
 </script>
 

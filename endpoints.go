@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 type Endpoints struct {
@@ -92,13 +92,22 @@ func (r updateUserResponse) error() error {
 func MakeCreateUserEndpoint(s Service) endpoint.Endpoint {
 	return func(c context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(createUserRequest)
-		id, e := s.CreateUser(c, User{
+		user := User{
+			ID:    uuid.New(),
 			Name:  req.Name,
 			Email: req.Email,
-		})
+		}
+		e := s.CreateUser(c, user)
+		if e != nil {
+			return createUserResponse{
+				e,
+				user.ID,
+			}, nil
+		}
+		e = s.SetPassword(c, user.ID, req.Password)
 		return createUserResponse{
 			e,
-			id,
+			user.ID,
 		}, nil
 	}
 }
@@ -110,7 +119,7 @@ type createUserRequest struct {
 }
 
 type createUserResponse struct {
-	Err error `json:"error"`
+	Err error `json:"error,omitempty"`
 	Id  uuid.UUID `json:"id,omitempty"`
 }
 
@@ -149,7 +158,7 @@ func MakeSetPasswordEndpoint(s Service) endpoint.Endpoint {
 
 type setPasswordRequest struct {
 	UserId   uuid.UUID
-	Password []byte
+	Password string
 }
 
 type setPasswordResponse struct {
@@ -170,7 +179,7 @@ func MakeAuthenticateEndpoint(s Service) endpoint.Endpoint {
 
 type authenticateRequest struct {
 	Email    string `json:"email"`
-	Password []byte `json:"password"`
+	Password string `json:"password"`
 }
 
 type authenticateResponse struct {
