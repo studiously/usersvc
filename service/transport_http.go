@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/Studiously/usersvc/ddl"
 	"github.com/Studiously/usersvc/templates"
 	lg"github.com/go-kit/kit/log"
@@ -34,6 +33,10 @@ const (
 	sessionName = "authentication"
 )
 
+var (
+	CSRF = csrf.Protect([]byte("aNdRgUkXp2r5u8x/A?D(G+KbPeShVmYq"), csrf.Secure(false))
+)
+
 // MakeHTTPHandler mounts all of the service endpoints into an http.Handler.
 // Useful in a usersvc server.
 func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handler {
@@ -44,8 +47,6 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		httptransport.ServerErrorLogger(logger),
 		httptransport.ServerErrorEncoder(encodeError),
 	}
-
-	var CSRF = csrf.Protect([]byte("aNdRgUkXp2r5u8x/A?D(G+KbPeShVmYq"), csrf.Secure(false))
 
 	r.Methods("POST").Path("/users").Handler(CSRF(httptransport.NewServer(
 		e.CreateUserEndpoint,
@@ -72,97 +73,44 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		//tmpls.ExecuteTemplate(w, "myaccount.html", )
 	})
 
-	r.Methods("GET").Path("/authenticate").Handler(CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, sessionName)
-		_, ok := session.Values["user"]
-		if ok {
+	r.Methods("GET").Path("/authenticate").Handler(MakeGetAuthenticate(client))
+	r.Methods("POST").Path("/authenticate").Handler(MakePostAuthenticate(s, client))
 
-		}
-		// If there is no challenge, we make one for our account management app.
-		challenge := r.FormValue("challenge")
-		logrus.Infof("%v", challenge)
-		if challenge == "" {
-			var authUrl = client.OAuth2Config("http://localhost:8080/callback", "offline", "openid").AuthCodeURL(csrf.Token(r)) + "&nonce=" + csrf.Token(r)
-			http.Redirect(w, r, authUrl, http.StatusFound)
-			return
-		}
-		// If there is a challenge, we pass it on.
-		tmpls.ExecuteTemplate(w, "authenticate.html", map[string]interface{}{
-			"challenge":      challenge,
-			csrf.TemplateTag: csrf.TemplateField(r),
-			"csrfToken":      csrf.Token(r),
-		})
+	r.Methods("GET").Path("/consent").Handler(MakeGetConsent(client))
+	r.Methods("POST").Path("/consent").Handler(MakePostConsent(client))
 
-	})))
+	return r
+}
 
-	// Actually log in here
-	r.Methods("POST").Path("/authenticate").Handler(CSRF(http.HandlerFunc(
+func MakeGetConsent(client *sdk.Client) http.Handler {
+	return CSRF(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			err := r.ParseForm()
-			if err != nil {
-				encodeError(nil, err, w)
+			challenge := r.URL.Query().Get("challenge")
+			if challenge == "" {
+				encodeError(nil, ErrNoChallenge, w)
 				return
 			}
-			user, err := s.Authenticate(
-				r.FormValue("email"),
-				r.FormValue("password"),
-			)
-			if err != nil {
-				encodeError(nil, err, w)
-				return
-			}
-			//r := response.(authenticateResponse)
-			//if r.error() != nil {
-			//	encodeError(c, r.error(), w)
-			//	return nil
-			//}
-			session, _ := store.Get(r, sessionName)
-			session.Values["user"] = user.ID
-
-			if err := store.Save(r, w, session); err != nil {
-				encodeError(nil, err, w)
-				return
-			}
-			challenge := r.FormValue("challenge")
 			claims, err := client.Consent.VerifyChallenge(challenge)
 			if err != nil {
-				encodeError(nil, err, w)
+				encodeError(nil, ErrNotVerified, w)
 				return
 			}
-			if i := sort.SearchStrings(claims.RequestedScopes, "nonconsentual"); i < len(claims.RequestedScopes) {
-				// Bypass consent
-				//client.
+
+			user := authenticated(r)
+			if user == uuid.Nil {
+				http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
 			}
 
-			http.Redirect(w, r, "/consent?challenge="+challenge, http.StatusTemporaryRedirect)
-		},
-	)))
+			tmpls.ExecuteTemplate(w, "consent.html", struct {
+				*sdk.ChallengeClaims
+				Challenge string
+				csrfField template.HTML
+			}{ChallengeClaims: claims, Challenge: challenge, csrfField: csrf.TemplateField(r) })
+		}))
+}
 
-	r.Methods("GET").Path("/consent").Handler(CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		challenge := r.URL.Query().Get("challenge")
-		if challenge == "" {
-			encodeError(nil, ErrNoChallenge, w)
-			return
-		}
-		claims, err := client.Consent.VerifyChallenge(challenge)
-		if err != nil {
-			encodeError(nil, ErrNotVerified, w)
-			return
-		}
-
-		user := authenticated(r)
-		if user == uuid.Nil {
-			http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
-		}
-
-		tmpls.ExecuteTemplate(w, "consent.html", struct {
-			*sdk.ChallengeClaims
-			Challenge string
-			csrfField template.HTML
-		}{ChallengeClaims: claims, Challenge: challenge, csrfField: csrf.TemplateField(r) })
-	})))
-
-	r.Methods("POST").Path("/consent").Handler(CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func MakePostConsent(client *sdk.Client) http.Handler {
+	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		challenge := r.URL.Query().Get("challenge")
 		if challenge == "" {
 			encodeError(nil, ErrNoChallenge, w)
@@ -208,13 +156,75 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		}
 
 		http.Redirect(w, r, redirectUrl, http.StatusFound)
-	})))
+	}))
+}
 
-	r.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func MakeGetAuthenticate(client *sdk.Client) http.Handler {
+	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := store.Get(r, sessionName)
+		_, ok := session.Values["user"]
+		if ok {
+			//http.Redirect(w, r, "/consent?challenge=")
+		}
+		// If there is no challenge, we make one for our account management app.
+		challenge := r.FormValue("challenge")
+		if challenge == "" {
+			var authUrl = client.OAuth2Config("http://localhost:8080/me", "offline", "openid").AuthCodeURL(csrf.Token(r)) + "&nonce=" + csrf.Token(r)
+			http.Redirect(w, r, authUrl, http.StatusFound)
+			return
+		}
+		// If there is a challenge, we pass it on.
+		tmpls.ExecuteTemplate(w, "authenticate.html", map[string]interface{}{
+			"challenge":      challenge,
+			csrf.TemplateTag: csrf.TemplateField(r),
+			"csrfToken":      csrf.Token(r),
+		})
 
-	})
+	}))
+}
 
-	return r
+func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
+	return CSRF(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			err := r.ParseForm()
+			if err != nil {
+				encodeError(nil, err, w)
+				return
+			}
+			user, err := s.Authenticate(
+				r.FormValue("email"),
+				r.FormValue("password"),
+			)
+			if err != nil {
+				encodeError(nil, err, w)
+				return
+			}
+			//r := response.(authenticateResponse)
+			//if r.error() != nil {
+			//	encodeError(c, r.error(), w)
+			//	return nil
+			//}
+			session, _ := store.Get(r, sessionName)
+			session.Values["user"] = user.ID
+
+			if err := store.Save(r, w, session); err != nil {
+				encodeError(nil, err, w)
+				return
+			}
+			challenge := r.FormValue("challenge")
+			claims, err := client.Consent.VerifyChallenge(challenge)
+			if err != nil {
+				encodeError(nil, err, w)
+				return
+			}
+			if i := sort.SearchStrings(claims.RequestedScopes, "nonconsentual"); i < len(claims.RequestedScopes) {
+				// Bypass consent
+				//client.
+			}
+
+			http.Redirect(w, r, "/consent?challenge="+challenge, http.StatusTemporaryRedirect)
+		},
+	))
 }
 
 func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
