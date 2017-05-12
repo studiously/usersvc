@@ -6,7 +6,8 @@
 </head>
 <body>
 <p>
-    An application (id: {{.Audience}}) requested consent to access resources on your behalf. The application wants access to:
+    An application (id: {{.Audience}}) requested consent to access resources on your behalf. The application wants
+    access to:
 </p>
 <form action="/consent?challenge={{.Challenge}}" method="POST">
     <ul>
@@ -14,6 +15,7 @@
         <li><input type="checkbox" name="{{.}}">{{.}}</li>
         {{end}}
     </ul>
+    {{.csrfField}}
     <input type="submit">
 </form>
 </body>

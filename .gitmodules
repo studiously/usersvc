@@ -1,0 +1,33 @@
+[submodule "vendor/github.com/Sirupsen/logrus"]
+	path = vendor/github.com/Sirupsen/logrus
+	url = https://github.com/Sirupsen/logrus
+[submodule "vendor/github.com/go-kit/kit"]
+	path = vendor/github.com/go-kit/kit
+	url = https://github.com/go-kit/kit
+[submodule "vendor/github.com/google/uuid"]
+	path = vendor/github.com/google/uuid
+	url = https://github.com/google/uuid
+[submodule "vendor/github.com/gorilla/csrf"]
+	path = vendor/github.com/gorilla/csrf
+	url = https://github.com/gorilla/csrf
+[submodule "vendor/github.com/gorilla/mux"]
+	path = vendor/github.com/gorilla/mux
+	url = https://github.com/gorilla/mux
+[submodule "vendor/github.com/gorilla/sessions"]
+	path = vendor/github.com/gorilla/sessions
+	url = https://github.com/gorilla/sessions
+[submodule "vendor/github.com/ory/common"]
+	path = vendor/github.com/ory/common
+	url = https://github.com/ory/common
+[submodule "vendor/github.com/ory/hydra"]
+	path = vendor/github.com/ory/hydra
+	url = https://github.com/ory/hydra
+[submodule "vendor/github.com/rubenv/sql-migrate"]
+	path = vendor/github.com/rubenv/sql-migrate
+	url = https://github.com/rubenv/sql-migrate
+[submodule "vendor/github.com/spf13/viper"]
+	path = vendor/github.com/spf13/viper
+	url = https://github.com/spf13/viper
+[submodule "vendor/golang.org/x/crypto"]
+	path = vendor/golang.org/x/crypto
+	url = https://go.googlesource.com/crypto
