@@ -142,7 +142,7 @@
             <button type="submit">create</button>
             <p class="message">Already registered? <a href="#">Sign In</a></p>
         </form>
-        <form id="signin" class="login-form" action="/login?challenge={{ .challenge }}" method="POST">
+        <form id="signin" class="login-form" action="/authenticate?challenge={{ .challenge }}" method="POST">
             <h1 align="left">Sign in</h1>
             <p align="left" class="error"></p>
             <input name="email" type="email" placeholder="email"/>
@@ -169,7 +169,7 @@
                 event.preventDefault()
                 $.ajax({
                     method: 'POST',
-                    url: '/signup',
+                    url: '/users',
                     processData: false,
                     contentType: false,
                     data: new FormData(register[0]),

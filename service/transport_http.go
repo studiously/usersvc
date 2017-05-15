@@ -121,6 +121,7 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 					encodeError(nil, err, w)
 				}
 				http.Redirect(w, r, redirectUrl, http.StatusFound)
+				return
 			}
 
 			tmpls.ExecuteTemplate(w, "consent.html", struct {
@@ -220,7 +221,7 @@ func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
 			//	return nil
 			//}
 			session, _ := store.Get(r, sessionName)
-			session.Values["user"] = user.ID
+			session.Values["user"] = user.ID.String()
 
 			if err := store.Save(r, w, session); err != nil {
 				encodeError(nil, err, w)

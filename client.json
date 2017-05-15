@@ -10,5 +10,5 @@
     "response_types": [
         "token"
     ],
-    "scope": "hydra nonconsentual openid profile"
+    "scope": "hydra nonconsentual offline openid"
 }
