@@ -1,0 +1,16 @@
+{
+    "actions": [
+        "get"
+    ] ,
+    "conditions": {},
+    "description": "Allow consent app to access hydra's keys" ,
+    "effect": "allow" ,
+    "id": "consent_keys" ,
+    "resources": [
+        "rn:hydra:hydra.consent.challenge:public",
+        "rn:hydra:hydra.consent.response:private"
+    ] ,
+    "subjects": [
+        "consent"
+    ]
+}

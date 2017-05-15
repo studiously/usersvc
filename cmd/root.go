@@ -62,8 +62,8 @@ var RootCmd = &cobra.Command{
 		}
 		// Set up Hydra
 		client, err := sdk.Connect(
-			sdk.ClientID(env.Getenv("HYDRA_CLIENT_ID", "demo")),
-			sdk.ClientSecret(env.Getenv("HYDRA_CLIENT_SECRET", "demo")),
+			sdk.ClientID(env.Getenv("HYDRA_CLIENT_ID", "consent")),
+			sdk.ClientSecret(env.Getenv("HYDRA_CLIENT_SECRET", "demovo")),
 			sdk.ClusterURL(env.Getenv("HYDRA_CLUSTER_URL", "http://localhost:4444")),
 		)
 		if err != nil {
