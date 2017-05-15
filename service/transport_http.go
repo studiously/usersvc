@@ -26,7 +26,7 @@ var (
 
 	ErrBadRouting    = errors.New("inconsistent mapping between route and handler (programmer error)")
 	ErrPersistCookie = errors.New("Failed to add a cookie. Make sure to enable cookies.")
-	ErrNoChallenge   = errors.New("Consent endpoint was called without a consent challenge")
+	ErrNoChallenge   = errors.New("Endpoint was called without a consent challenge")
 	ErrNotVerified   = errors.New("The consent challenge could not be verified")
 )
 
@@ -70,13 +70,15 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		options...
 	))
 
-	r.Methods("GET").Path("/me").Handler(MakeGetMe(client))
+	r.Methods("GET").Path("/me").Handler(MakeGetMe(s, client))
 
 	r.Methods("GET").Path("/authenticate").Handler(MakeGetAuthenticate(client))
 	r.Methods("POST").Path("/authenticate").Handler(MakePostAuthenticate(s, client))
 
 	r.Methods("GET").Path("/consent").Handler(MakeGetConsent(client))
 	r.Methods("POST").Path("/consent").Handler(MakePostConsent(client))
+
+	r.Methods("GET").Path("/signout").Handler(MakeGetSignout())
 
 	return r
 }
@@ -233,7 +235,7 @@ func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
 	))
 }
 
-func MakeGetMe(client *sdk.Client) http.Handler {
+func MakeGetMe(s Service, client *sdk.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if authenticated(r) == uuid.Nil {
 			nonce := rand_str(24)
@@ -241,7 +243,23 @@ func MakeGetMe(client *sdk.Client) http.Handler {
 			http.Redirect(w, r, authUrl, http.StatusFound)
 			return
 		}
-		tmpls.ExecuteTemplate(w, "me.html", authenticated(r))
+		uid := authenticated(r)
+		user, err := s.GetUser(uid)
+		if err != nil {
+			tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
+				"error":            "Internal Server Error",
+				"errorDescription": err.Error(),
+			})
+			return
+		}
+		tmpls.ExecuteTemplate(w, "me.html", user)
+	})
+}
+func MakeGetSignout() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := store.Get(r, sessionName)
+		delete(session.Values, "user")
+		session.Save(r, w)
 	})
 }
 

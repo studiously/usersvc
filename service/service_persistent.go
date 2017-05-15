@@ -22,7 +22,7 @@ type persistentService struct {
 	*sdk.Client
 }
 
-func (s *persistentService) GetUser(c context.Context, id uuid.UUID) (User, error) {
+func (s *persistentService) GetUser(id uuid.UUID) (User, error) {
 	u, err := models.UserByID(s.DB, id)
 	if err != nil {
 		return User{}, err

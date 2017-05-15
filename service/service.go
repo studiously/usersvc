@@ -17,7 +17,7 @@ var (
 )
 
 type Service interface {
-	GetUser(c context.Context, id uuid.UUID) (User, error)
+	GetUser(id uuid.UUID) (User, error)
 	GetProfile(c context.Context, id uuid.UUID) (Profile, error)
 	CreateUser(c context.Context, user User) (err error)
 	UpdateUser(c context.Context, user User) error

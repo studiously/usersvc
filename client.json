@@ -1,14 +1,16 @@
 {
-    "id": "consent",
-    "client_secret": "demovo",
-    "client_name": "consent",
-    "redirect_uris": ["http://localhost:8080/me"],
-    "grant_types": [
-        "client_credentials",
-	"code"
-    ],
-    "response_types": [
-        "token"
-    ],
-    "scope": "hydra nonconsentual offline openid"
+  "id": "consent",
+  "client_secret": "demovo",
+  "client_name": "consent",
+  "redirect_uris": [
+    "http://localhost:8080/me"
+  ],
+  "grant_types": [
+    "client_credentials",
+    "code"
+  ],
+  "response_types": [
+    "token"
+  ],
+  "scope": "hydra nonconsentual offline openid"
 }

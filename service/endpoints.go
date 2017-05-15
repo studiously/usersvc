@@ -9,21 +9,21 @@ import (
 )
 
 type Endpoints struct {
-	GetUserEndpoint      endpoint.Endpoint
-	GetProfileEndpoint   endpoint.Endpoint
-	UpdateUserEndpoint   endpoint.Endpoint
-	CreateUserEndpoint   endpoint.Endpoint
-	SetPasswordEndpoint  endpoint.Endpoint
+	GetUserEndpoint     endpoint.Endpoint
+	GetProfileEndpoint  endpoint.Endpoint
+	UpdateUserEndpoint  endpoint.Endpoint
+	CreateUserEndpoint  endpoint.Endpoint
+	SetPasswordEndpoint endpoint.Endpoint
 	//AuthenticateEndpoint endpoint.Endpoint
 }
 
 func MakeServerEndpoints(s Service, client *sdk.Client) Endpoints {
 	return Endpoints{
-		GetUserEndpoint:      MakeGetUserEndpoint(s),
-		GetProfileEndpoint:   MakeGetProfileEndpoint(s),
-		UpdateUserEndpoint:   MakeUpdateUserEndpoint(s),
-		CreateUserEndpoint:   MakeCreateUserEndpoint(s),
-		SetPasswordEndpoint:  MakeSetPasswordEndpoint(s),
+		GetUserEndpoint:     MakeGetUserEndpoint(s),
+		GetProfileEndpoint:  MakeGetProfileEndpoint(s),
+		UpdateUserEndpoint:  MakeUpdateUserEndpoint(s),
+		CreateUserEndpoint:  MakeCreateUserEndpoint(s),
+		SetPasswordEndpoint: MakeSetPasswordEndpoint(s),
 		//AuthenticateEndpoint: MakeAuthenticateEndpoint(s),
 	}
 }
@@ -31,7 +31,7 @@ func MakeServerEndpoints(s Service, client *sdk.Client) Endpoints {
 func MakeGetUserEndpoint(s Service) endpoint.Endpoint {
 	return func(c context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(getUserRequest)
-		user, e := s.GetUser(c, req.Id)
+		user, e := s.GetUser(req.Id)
 		return getUserResponse{e, user}, nil
 	}
 }

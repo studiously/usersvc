@@ -32,7 +32,7 @@ func NewInmemService() Service {
 	}
 }
 
-func (s *inmemService) GetUser(c context.Context, id uuid.UUID) (User, error) {
+func (s *inmemService) GetUser(id uuid.UUID) (User, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 	if u, ok := s.m[id]; ok {
