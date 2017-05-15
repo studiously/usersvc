@@ -121,6 +121,7 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 				})
 				if err != nil {
 					encodeError(nil, err, w)
+					return
 				}
 				http.Redirect(w, r, redirectUrl, http.StatusFound)
 				return
@@ -169,6 +170,7 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 		})
 		if err != nil {
 			encodeError(nil, err, w)
+			return
 		}
 
 		http.Redirect(w, r, redirectUrl, http.StatusFound)

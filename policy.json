@@ -1,16 +1,18 @@
 {
-    "actions": [
-        "get"
-    ] ,
-    "conditions": {},
-    "description": "Allow consent app to access hydra's keys" ,
-    "effect": "allow" ,
-    "id": "consent_keys" ,
-    "resources": [
-        "rn:hydra:keys:hydra.consent.challenge:public",
-        "rn:hydra:keys:hydra.consent.challenge:private"
-    ] ,
-    "subjects": [
-        "consent"
-    ]
+  "actions": [
+    "get"
+  ],
+  "conditions": {},
+  "description": "Allow consent app to access hydra's keys",
+  "effect": "allow",
+  "id": "consent_keys",
+  "resources": [
+    "rn:hydra:keys:hydra.consent.challenge:public",
+    "rn:hydra:keys:hydra.consent.challenge:private",
+    "rn:hydra:keys:hydra.consent.response:private",
+    "rn:hydra:keys:hydra.consent.response:public"
+  ],
+  "subjects": [
+    "consent"
+  ]
 }
