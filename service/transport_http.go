@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"html/template"
@@ -69,9 +70,7 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		options...
 	))
 
-	r.Methods("GET").Path("/me").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//tmpls.ExecuteTemplate(w, "myaccount.html", )
-	})
+	r.Methods("GET").Path("/me").Handler(MakeGetMe(client))
 
 	r.Methods("GET").Path("/authenticate").Handler(MakeGetAuthenticate(client))
 	r.Methods("POST").Path("/authenticate").Handler(MakePostAuthenticate(s, client))
@@ -85,6 +84,14 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 func MakeGetConsent(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
+			error := r.URL.Query().Get("error")
+			if error != "" {
+				tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
+					"error":            error,
+					"errorDescription": r.URL.Query().Get("error_description"),
+				})
+				return
+			}
 			challenge := r.URL.Query().Get("challenge")
 			if challenge == "" {
 				encodeError(nil, ErrNoChallenge, w)
@@ -99,6 +106,21 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 			user := authenticated(r)
 			if user == uuid.Nil {
 				http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
+				return
+			}
+
+			if sort.SearchStrings(claims.RequestedScopes, "nonconsentual") < len(claims.RequestedScopes) {
+				redirectUrl, err := client.Consent.GenerateResponse(&sdk.ResponseRequest{
+					Challenge: challenge,
+					// The subject is a string, usually the user id.
+					Subject: user.String(),
+					// The scopes our user granted.
+					Scopes: claims.RequestedScopes,
+				})
+				if err != nil {
+					encodeError(nil, err, w)
+				}
+				http.Redirect(w, r, redirectUrl, http.StatusFound)
 			}
 
 			tmpls.ExecuteTemplate(w, "consent.html", struct {
@@ -120,6 +142,7 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 		user := authenticated(r)
 		if user == uuid.Nil {
 			http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
+			return
 		}
 
 		if err := r.ParseForm(); err != nil {
@@ -140,16 +163,6 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 
 			// The scopes our user granted.
 			Scopes: grantedScopes,
-
-			// Data that will be available on the token introspection and warden endpoints.
-			AccessTokenExtra: struct {
-				Foo string `json:"foo"`
-			}{Foo: "foo"},
-
-			// If we issue an ID token, we can set extra data for that id token here.
-			IDTokenExtra: struct {
-				Bar string `json:"bar"`
-			}{Bar: "bar"},
 		})
 		if err != nil {
 			encodeError(nil, err, w)
@@ -161,23 +174,25 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 
 func MakeGetAuthenticate(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// If there is no challenge, we err out.
+		challenge := r.FormValue("challenge")
+		if challenge == "" {
+			encodeError(nil, ErrNoChallenge, w)
+			return
+		}
+
+		// If the user is already authenticated, redirect to the consent phase.
 		session, _ := store.Get(r, sessionName)
 		_, ok := session.Values["user"]
 		if ok {
-			//http.Redirect(w, r, "/consent?challenge=")
-		}
-		// If there is no challenge, we make one for our account management app.
-		challenge := r.FormValue("challenge")
-		if challenge == "" {
-			var authUrl = client.OAuth2Config("http://localhost:8080/me", "offline", "openid").AuthCodeURL(csrf.Token(r)) + "&nonce=" + csrf.Token(r)
-			http.Redirect(w, r, authUrl, http.StatusFound)
+			http.Redirect(w, r, "/consent?challenge="+challenge, http.StatusFound)
 			return
 		}
+
 		// If there is a challenge, we pass it on.
 		tmpls.ExecuteTemplate(w, "authenticate.html", map[string]interface{}{
 			"challenge":      challenge,
 			csrf.TemplateTag: csrf.TemplateField(r),
-			"csrfToken":      csrf.Token(r),
 		})
 
 	}))
@@ -212,19 +227,21 @@ func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
 				return
 			}
 			challenge := r.FormValue("challenge")
-			claims, err := client.Consent.VerifyChallenge(challenge)
-			if err != nil {
-				encodeError(nil, err, w)
-				return
-			}
-			if i := sort.SearchStrings(claims.RequestedScopes, "nonconsentual"); i < len(claims.RequestedScopes) {
-				// Bypass consent
-				//client.
-			}
-
-			http.Redirect(w, r, "/consent?challenge="+challenge, http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "/consent?challenge="+challenge, http.StatusFound)
 		},
 	))
+}
+
+func MakeGetMe(client *sdk.Client) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authenticated(r) == uuid.Nil {
+			nonce := rand_str(24)
+			var authUrl = client.OAuth2Config("http://localhost:8080/me", "offline", "nonconsentual", "openid").AuthCodeURL(nonce) + "&nonce=" + nonce
+			http.Redirect(w, r, authUrl, http.StatusFound)
+			return
+		}
+		tmpls.ExecuteTemplate(w, "me.html", authenticated(r))
+	})
 }
 
 func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
@@ -326,4 +343,14 @@ func authenticated(r *http.Request) uuid.UUID {
 		return uuid.Nil
 	}
 	return user
+}
+
+func rand_str(str_size int) string {
+	alphanum := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	var bytes = make([]byte, str_size)
+	rand.Read(bytes)
+	for i, b := range bytes {
+		bytes[i] = alphanum[b%byte(len(alphanum))]
+	}
+	return string(bytes)
 }
