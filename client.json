@@ -7,10 +7,15 @@
   ],
   "grant_types": [
     "client_credentials",
-    "code"
+    "implicit",
+    "code",
+    "refresh_token",
+    "authorization_code",
+    "password"
   ],
   "response_types": [
-    "token"
+    "id_token",
+    "code"
   ],
   "scope": "hydra nonconsentual offline openid"
 }

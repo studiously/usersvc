@@ -17,6 +17,7 @@ then
 ```
 hydra clients import client.json
 hydra policies create -f policy.json
+hydra policies create -f policy_2.json
 ```
 
 ## TODO

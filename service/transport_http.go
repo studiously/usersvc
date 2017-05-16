@@ -248,11 +248,7 @@ func MakeGetMe(s Service, client *sdk.Client) http.Handler {
 		uid := authenticated(r)
 		user, err := s.GetUser(uid)
 		if err != nil {
-			tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
-				"error":            "Internal Server Error",
-				"errorDescription": err.Error(),
-			})
-			return
+			http.Redirect(w, r, "/signout", http.StatusFound)
 		}
 		tmpls.ExecuteTemplate(w, "me.html", user)
 	})
@@ -262,6 +258,7 @@ func MakeGetSignout() http.Handler {
 		session, _ := store.Get(r, sessionName)
 		delete(session.Values, "user")
 		session.Save(r, w)
+		http.Redirect(w, r, "/me", http.StatusFound)
 	})
 }
 
