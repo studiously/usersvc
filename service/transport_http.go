@@ -58,6 +58,10 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 	//	options...
 	//)))
 
+	r.Methods("GET").Path("/").HandlerFunc(func (w http.ResponseWriter, r *http.Request){
+		http.Redirect(w, r, "/me", http.StatusPermanentRedirect)
+	})
+
 	r.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(
 		e.GetUserEndpoint,
 		decodeGetUserRequest,
