@@ -26,3 +26,5 @@ hydra policies create -f policy_2.json
 - [ ] Complete Refactor
 - [ ] Unit Tests
 - [ ] System/Integration Tests
+- [ ] Actual Error Handling
+- [ ] Real User Management Page

@@ -16,18 +16,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
+	"github.com/ory/common/env"
 	"github.com/ory/hydra/sdk"
 )
 
 var (
 	tmpls = templates.NewBinTemplate(ddl.Asset, ddl.AssetDir).MustLoadDirectory("tmpl")
-	store = sessions.NewCookieStore([]byte("something-very-secret-keep-it-safe"))
+	store = sessions.NewCookieStore([]byte(env.Getenv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(32)))))
 
-	ErrBadRouting    = errors.New("inconsistent mapping between route and handler (programmer error)")
+	ErrBadRouting    = errors.New("Inconsistent mapping between route and handler (programmer error).")
 	ErrPersistCookie = errors.New("Failed to add a cookie. Make sure to enable cookies.")
 	ErrNoChallenge   = errors.New("Endpoint was called without a consent challenge")
-	ErrNotVerified   = errors.New("The consent challenge could not be verified")
+	//ErrNotVerified   = errors.New("The consent challenge could not be verified")
 )
 
 const (
@@ -86,32 +88,41 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 func MakeGetConsent(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
+			// First, check if hydra returned an error.
 			error := r.URL.Query().Get("error")
 			if error != "" {
+				// Uh oh! There be a problem here. We can just render the error template here.
 				tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
 					"error":            error,
 					"errorDescription": r.URL.Query().Get("error_description"),
 				})
 				return
 			}
+			// Get the challenge from the URL.
 			challenge := r.URL.Query().Get("challenge")
+			// Check that the challenge exists.
 			if challenge == "" {
-				encodeError(nil, ErrNoChallenge, w)
+				// Without a challenge, we can't authenticate--default to redirecting the user to /me to initialize the process. This makes it work even without a challenge--it just defaults to the user profile app.
+				http.Redirect(w, r, "/me", http.StatusFound)
 				return
 			}
+			// Check that the challenge is OK.
 			claims, err := client.Consent.VerifyChallenge(challenge)
 			if err != nil {
-				encodeError(nil, ErrNotVerified, w)
+				// If the challenge is not OK, redirect to /me again.
+				http.Redirect(w, r, "/me", http.StatusFound)
 				return
 			}
-
+			// Check if the user is authenticated.
 			user := authenticated(r)
 			if user == uuid.Nil {
+				// Nope, not authenticated. Redirect the user to the authenticate endpoint.
 				http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
 				return
 			}
-
+			// Determine if nonconsentual is a requested scope.
 			if sort.SearchStrings(claims.RequestedScopes, "nonconsentual") < len(claims.RequestedScopes) {
+				// Since consent is nonconsentual, we can bypass the consent page and automatically grant all requested scopes. This will only apply to official clients.
 				redirectUrl, err := client.Consent.GenerateResponse(&sdk.ResponseRequest{
 					Challenge: challenge,
 					// The subject is a string, usually the user id.
@@ -119,6 +130,7 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 					// The scopes our user granted.
 					Scopes: claims.RequestedScopes,
 				})
+				// If there's a problem, we need to abort and render the error page.
 				if err != nil {
 					encodeError(nil, err, w)
 					return
@@ -179,10 +191,10 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 
 func MakeGetAuthenticate(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If there is no challenge, we err out.
+		// If there is no challenge, we redirect to the /me endpoint.
 		challenge := r.FormValue("challenge")
 		if challenge == "" {
-			encodeError(nil, ErrNoChallenge, w)
+			http.Redirect(w, r, "/me", http.StatusFound)
 			return
 		}
 
@@ -219,16 +231,11 @@ func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
 				encodeError(nil, err, w)
 				return
 			}
-			//r := response.(authenticateResponse)
-			//if r.error() != nil {
-			//	encodeError(c, r.error(), w)
-			//	return nil
-			//}
 			session, _ := store.Get(r, sessionName)
 			session.Values["user"] = user.ID.String()
 
 			if err := store.Save(r, w, session); err != nil {
-				encodeError(nil, err, w)
+				encodeError(nil, ErrPersistCookie, w)
 				return
 			}
 			challenge := r.FormValue("challenge")
@@ -298,6 +305,10 @@ func decodeGetProfileRequest(_ context.Context, r *http.Request) (request interf
 	id, err := uuid.Parse(sid)
 	request = getProfileRequest{UserId: id}
 	return
+}
+
+func renderError(w http.ResponseWriter, error, description string) {
+
 }
 
 //func decodeAuthenticateRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
