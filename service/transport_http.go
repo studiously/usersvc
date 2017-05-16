@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"github.com/Studiously/usersvc/ddl"
 	"github.com/Studiously/usersvc/templates"
@@ -23,12 +24,15 @@ import (
 )
 
 var (
-	tmpls = templates.NewBinTemplate(ddl.Asset, ddl.AssetDir).MustLoadDirectory("tmpl")
-	store = sessions.NewCookieStore([]byte(env.Getenv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(32)))))
-
+	tmpls            = templates.NewBinTemplate(ddl.Asset, ddl.AssetDir).MustLoadDirectory("tmpl")
+	store            = sessions.NewCookieStore([]byte(env.Getenv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(32)))))
+	secure, _        = strconv.ParseBool(env.Getenv("SECURE_CSRF", "false"))
+	CSRF             = csrf.Protect([]byte("aNdRgUkXp2r5u8x/A?D(G+KbPeShVmYq"), csrf.Secure(secure))
 	ErrBadRouting    = errors.New("Inconsistent mapping between route and handler (programmer error).")
 	ErrPersistCookie = errors.New("Failed to add a cookie. Make sure to enable cookies.")
+	ErrInternal      = errors.New("We're having a problem on our end. Hang tight and we'll get it fixed.")
 	ErrNoChallenge   = errors.New("Endpoint was called without a consent challenge")
+	ErrBadRequest    = errors.New("There was an issue parsing the request.")
 	//ErrNotVerified   = errors.New("The consent challenge could not be verified")
 )
 
@@ -36,27 +40,23 @@ const (
 	sessionName = "authentication"
 )
 
-var (
-	CSRF = csrf.Protect([]byte("aNdRgUkXp2r5u8x/A?D(G+KbPeShVmYq"), csrf.Secure(false))
-)
-
 // MakeHTTPHandler mounts all of the service endpoints into an http.Handler.
 // Useful in a usersvc server.
 func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handler {
 	r := mux.NewRouter()
-	e := MakeServerEndpoints(s, client)
+	e := MakeServerEndpoints(s)
 
 	options := []httptransport.ServerOption{
 		httptransport.ServerErrorLogger(logger),
 		httptransport.ServerErrorEncoder(encodeError),
 	}
 
-	r.Methods("POST").Path("/users").Handler(CSRF(httptransport.NewServer(
-		e.CreateUserEndpoint,
-		decodeCreateUserRequest,
-		encodeResponse,
-		options...
-	)))
+	//r.Methods("POST").Path("/users").Handler(CSRF(httptransport.NewServer(
+	//	e.CreateUserEndpoint,
+	//	decodeCreateUserRequest,
+	//	encodeResponse,
+	//	options...
+	//)))
 
 	r.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(
 		e.GetUserEndpoint,
@@ -74,26 +74,79 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 
 	r.Methods("GET").Path("/me").Handler(MakeGetMe(s, client))
 
-	r.Methods("GET").Path("/authenticate").Handler(MakeGetAuthenticate(client))
-	r.Methods("POST").Path("/authenticate").Handler(MakePostAuthenticate(s, client))
+	r.Methods("GET").Path("/register").Handler(MakeGetRegister())
+	r.Methods("POST").Path("/register").Handler(MakePostRegister(s))
+
+	r.Methods("GET").Path("/login").Handler(MakeGetLogin(client))
+	r.Methods("POST").Path("/login").Handler(MakePostLogin(s))
 
 	r.Methods("GET").Path("/consent").Handler(MakeGetConsent(client))
 	r.Methods("POST").Path("/consent").Handler(MakePostConsent(client))
 
-	r.Methods("GET").Path("/signout").Handler(MakeGetSignout())
+	r.Methods("GET").Path("/logout").Handler(MakeGetLogout())
 
 	return r
+}
+
+func MakeGetRegister() http.Handler {
+	return CSRF(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
+				csrf.TemplateTag: csrf.TemplateField(r),
+				"challenge":      r.URL.Query().Get("challenge"),
+				"error":          r.URL.Query().Get("error"),
+			})
+		}))
+}
+
+func MakePostRegister(s Service) http.Handler {
+	return CSRF(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			err := r.ParseForm()
+			if err != nil {
+				tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
+					csrf.TemplateTag: csrf.TemplateField(r),
+					"challenge":      r.URL.Query().Get("challenge"),
+					"error":          ErrBadRequest.Error(),
+				})
+				return
+			}
+			user := User{
+				ID:    uuid.New(),
+				Name:  r.FormValue("name"),
+				Email: r.FormValue("email"),
+			}
+			err = s.CreateUser(user)
+			if err != nil {
+				tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
+					csrf.TemplateTag: csrf.TemplateField(r),
+					"challenge":      r.URL.Query().Get("challenge"),
+					"error":          ErrInternal.Error(),
+				})
+				return
+			}
+			err = s.SetPassword(user.ID, r.FormValue("password"))
+			if err != nil {
+				tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
+					csrf.TemplateTag: csrf.TemplateField(r),
+					"challenge":      r.URL.Query().Get("challenge"),
+					"error":          ErrInternal.Error(),
+				})
+				return
+			}
+			http.Redirect(w, r, "/login?email="+user.Email+"&challenge="+r.URL.Query().Get("challenge"), http.StatusFound)
+		}))
 }
 
 func MakeGetConsent(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// First, check if hydra returned an error.
-			error := r.URL.Query().Get("error")
-			if error != "" {
+			err := r.URL.Query().Get("error")
+			if err != "" {
 				// Uh oh! There be a problem here. We can just render the error template here.
 				tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
-					"error":            error,
+					"error":            err,
 					"errorDescription": r.URL.Query().Get("error_description"),
 				})
 				return
@@ -107,8 +160,8 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 				return
 			}
 			// Check that the challenge is OK.
-			claims, err := client.Consent.VerifyChallenge(challenge)
-			if err != nil {
+			claims, err2 := client.Consent.VerifyChallenge(challenge)
+			if err2 != nil {
 				// If the challenge is not OK, redirect to /me again.
 				http.Redirect(w, r, "/me", http.StatusFound)
 				return
@@ -117,7 +170,7 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 			user := authenticated(r)
 			if user == uuid.Nil {
 				// Nope, not authenticated. Redirect the user to the authenticate endpoint.
-				http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
+				http.Redirect(w, r, "/login?challenge="+challenge, http.StatusFound)
 				return
 			}
 			// Determine if nonconsentual is a requested scope.
@@ -157,7 +210,7 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 
 		user := authenticated(r)
 		if user == uuid.Nil {
-			http.Redirect(w, r, "/authenticate?challenge="+challenge, http.StatusFound)
+			http.Redirect(w, r, "/login?challenge="+challenge, http.StatusFound)
 			return
 		}
 
@@ -189,15 +242,13 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 	}))
 }
 
-func MakeGetAuthenticate(client *sdk.Client) http.Handler {
+func MakeGetLogin(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If there is no challenge, we redirect to the /me endpoint.
 		challenge := r.FormValue("challenge")
-		if challenge == "" {
-			http.Redirect(w, r, "/me", http.StatusFound)
-			return
-		}
-
+		//if challenge == "" {
+		//	http.Redirect(w, r, "/me", http.StatusFound)
+		//	return
+		//}
 		// If the user is already authenticated, redirect to the consent phase.
 		session, _ := store.Get(r, sessionName)
 		_, ok := session.Values["user"]
@@ -207,20 +258,26 @@ func MakeGetAuthenticate(client *sdk.Client) http.Handler {
 		}
 
 		// If there is a challenge, we pass it on.
-		tmpls.ExecuteTemplate(w, "authenticate.html", map[string]interface{}{
+		tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
 			"challenge":      challenge,
+			"email":          r.URL.Query().Get("email"),
 			csrf.TemplateTag: csrf.TemplateField(r),
 		})
 
 	}))
 }
 
-func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
+func MakePostLogin(s Service) http.Handler {
 	return CSRF(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			err := r.ParseForm()
 			if err != nil {
-				encodeError(nil, err, w)
+				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
+					"error":     err.Error(),
+					"challenge": r.URL.Query().Get("challenge"),
+					csrf.TemplateTag: csrf.TemplateField(r),
+
+				})
 				return
 			}
 			user, err := s.Authenticate(
@@ -228,14 +285,22 @@ func MakePostAuthenticate(s Service, client *sdk.Client) http.Handler {
 				r.FormValue("password"),
 			)
 			if err != nil {
-				encodeError(nil, err, w)
+				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
+					"error":          err.Error(),
+					"challenge":      r.URL.Query().Get("challenge"),
+					csrf.TemplateTag: csrf.TemplateField(r),
+				})
 				return
 			}
 			session, _ := store.Get(r, sessionName)
 			session.Values["user"] = user.ID.String()
 
 			if err := store.Save(r, w, session); err != nil {
-				encodeError(nil, ErrPersistCookie, w)
+				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
+					"error":          ErrPersistCookie.Error(),
+					"challenge":      r.URL.Query().Get("challenge"),
+					csrf.TemplateTag: csrf.TemplateField(r),
+				})
 				return
 			}
 			challenge := r.FormValue("challenge")
@@ -255,12 +320,14 @@ func MakeGetMe(s Service, client *sdk.Client) http.Handler {
 		uid := authenticated(r)
 		user, err := s.GetUser(uid)
 		if err != nil {
-			http.Redirect(w, r, "/signout", http.StatusFound)
+			http.Redirect(w, r, "/logout", http.StatusFound)
 		}
-		tmpls.ExecuteTemplate(w, "me.html", user)
+		tmpls.ExecuteTemplate(w, "me.html", map[string]interface{}{
+			"user": user,
+		})
 	})
 }
-func MakeGetSignout() http.Handler {
+func MakeGetLogout() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, sessionName)
 		delete(session.Values, "user")
@@ -269,21 +336,21 @@ func MakeGetSignout() http.Handler {
 	})
 }
 
-func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
-	//var req createUserRequest
-	//json.NewDecoder(r.Body).Decode(&req)
-	//return req, err
-	err = r.ParseForm()
-	if err != nil {
-		return
-	}
-	request = createUserRequest{
-		Name:     r.FormValue("name"),
-		Email:    r.FormValue("email"),
-		Password: r.FormValue("password"),
-	}
-	return
-}
+//func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
+//	//var req createUserRequest
+//	//json.NewDecoder(r.Body).Decode(&req)
+//	//return req, err
+//	err = r.ParseForm()
+//	if err != nil {
+//		return
+//	}
+//	request = createUserRequest{
+//		Name:     r.FormValue("name"),
+//		Email:    r.FormValue("email"),
+//		Password: r.FormValue("password"),
+//	}
+//	return
+//}
 
 func decodeGetUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
 	vars := mux.Vars(r)

@@ -43,7 +43,7 @@ func (s *persistentService) GetProfile(c context.Context, id uuid.UUID) (Profile
 	}, nil
 }
 
-func (s *persistentService) CreateUser(c context.Context, user User) (err error) {
+func (s *persistentService) CreateUser(user User) (err error) {
 	if u, _ := models.UserByEmail(s.DB, user.Email); u != nil && u.Exists() {
 		return ErrUserExists
 	}
@@ -68,7 +68,7 @@ func (s *persistentService) UpdateUser(c context.Context, user User) error {
 	return err
 }
 
-func (s *persistentService) SetPassword(c context.Context, userId uuid.UUID, password string) error {
+func (s *persistentService) SetPassword(userId uuid.UUID, password string) error {
 	li, err := models.LocalIdentityByUserID(s.DB, userId)
 	if err != nil {
 		li = &models.LocalIdentity{

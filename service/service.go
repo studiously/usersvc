@@ -19,9 +19,9 @@ var (
 type Service interface {
 	GetUser(id uuid.UUID) (User, error)
 	GetProfile(c context.Context, id uuid.UUID) (Profile, error)
-	CreateUser(c context.Context, user User) (err error)
+	CreateUser(user User) (err error)
 	UpdateUser(c context.Context, user User) error
-	SetPassword(c context.Context, userId uuid.UUID, password string) error
+	SetPassword(userId uuid.UUID, password string) error
 	Authenticate(email string, password string) (User, error)
 }
 

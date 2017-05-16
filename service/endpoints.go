@@ -5,24 +5,23 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/google/uuid"
-	"github.com/ory/hydra/sdk"
 )
 
 type Endpoints struct {
 	GetUserEndpoint     endpoint.Endpoint
 	GetProfileEndpoint  endpoint.Endpoint
 	UpdateUserEndpoint  endpoint.Endpoint
-	CreateUserEndpoint  endpoint.Endpoint
+	//CreateUserEndpoint  endpoint.Endpoint
 	SetPasswordEndpoint endpoint.Endpoint
 	//AuthenticateEndpoint endpoint.Endpoint
 }
 
-func MakeServerEndpoints(s Service, client *sdk.Client) Endpoints {
+func MakeServerEndpoints(s Service) Endpoints {
 	return Endpoints{
 		GetUserEndpoint:     MakeGetUserEndpoint(s),
 		GetProfileEndpoint:  MakeGetProfileEndpoint(s),
 		UpdateUserEndpoint:  MakeUpdateUserEndpoint(s),
-		CreateUserEndpoint:  MakeCreateUserEndpoint(s),
+		//CreateUserEndpoint:  MakeCreateUserEndpoint(s),
 		SetPasswordEndpoint: MakeSetPasswordEndpoint(s),
 		//AuthenticateEndpoint: MakeAuthenticateEndpoint(s),
 	}
@@ -90,43 +89,43 @@ func (r updateUserResponse) error() error {
 	return r.Err
 }
 
-func MakeCreateUserEndpoint(s Service) endpoint.Endpoint {
-	return func(c context.Context, request interface{}) (response interface{}, err error) {
-		req := request.(createUserRequest)
-		user := User{
-			ID:    uuid.New(),
-			Name:  req.Name,
-			Email: req.Email,
-		}
-		e := s.CreateUser(c, user)
-		if e != nil {
-			return createUserResponse{
-				e,
-				user.ID,
-			}, nil
-		}
-		e = s.SetPassword(c, user.ID, req.Password)
-		return createUserResponse{
-			e,
-			user.ID,
-		}, nil
-	}
-}
-
-type createUserRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type createUserResponse struct {
-	Err error `json:"error,omitempty"`
-	Id  uuid.UUID `json:"id,omitempty"`
-}
-
-func (r createUserResponse) error() error {
-	return r.Err
-}
+//func MakeCreateUserEndpoint(s Service) endpoint.Endpoint {
+//	return func(c context.Context, request interface{}) (response interface{}, err error) {
+//		req := request.(createUserRequest)
+//		user := User{
+//			ID:    uuid.New(),
+//			Name:  req.Name,
+//			Email: req.Email,
+//		}
+//		e := s.CreateUser(c, user)
+//		if e != nil {
+//			return createUserResponse{
+//				e,
+//				user.ID,
+//			}, nil
+//		}
+//		e = s.SetPassword(c, user.ID, req.Password)
+//		return createUserResponse{
+//			e,
+//			user.ID,
+//		}, nil
+//	}
+//}
+//
+//type createUserRequest struct {
+//	Name     string `json:"name"`
+//	Email    string `json:"email"`
+//	Password string `json:"password"`
+//}
+//
+//type createUserResponse struct {
+//	Err error `json:"error,omitempty"`
+//	Id  uuid.UUID `json:"id,omitempty"`
+//}
+//
+//func (r createUserResponse) error() error {
+//	return r.Err
+//}
 
 //func MakeSetUserActiveEndpoint(s Service) endpoint.Endpoint {
 //	return func(c context.Context, request interface{}) (response interface{}, err error) {
@@ -152,7 +151,7 @@ func (r createUserResponse) error() error {
 func MakeSetPasswordEndpoint(s Service) endpoint.Endpoint {
 	return func(c context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(setPasswordRequest)
-		e := s.SetPassword(c, req.UserId, req.Password)
+		e := s.SetPassword(req.UserId, req.Password)
 		return setPasswordResponse{e}, nil
 	}
 }

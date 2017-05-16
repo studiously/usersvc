@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -10,8 +9,8 @@ import (
 )
 
 type inmemService struct {
-	m   map[uuid.UUID]*User
-	p   map[uuid.UUID][]byte
+	m   map[string]*User
+	p   map[string][]byte
 	mtx sync.RWMutex
 }
 
@@ -26,8 +25,8 @@ func NewInmemService() Service {
 	//	logrus.WithError(err).Fatal("failed to initialize snowflake worker")
 	//}
 	return &inmemService{
-		m:   make(map[uuid.UUID]*User),
-		p:   make(map[uuid.UUID][]byte),
+		m:   make(map[string]*User),
+		p:   make(map[string][]byte),
 		mtx: sync.RWMutex{},
 	}
 }
@@ -35,7 +34,7 @@ func NewInmemService() Service {
 func (s *inmemService) GetUser(id uuid.UUID) (User, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
-	if u, ok := s.m[id]; ok {
+	if u, ok := s.m[id.String()]; ok {
 		return *u, nil
 	}
 	return User{}, ErrNotFound
@@ -44,7 +43,7 @@ func (s *inmemService) GetUser(id uuid.UUID) (User, error) {
 func (s *inmemService) GetProfile(c context.Context, id uuid.UUID) (Profile, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
-	if u, ok := s.m[id]; ok {
+	if u, ok := s.m[id.String()]; ok {
 		return Profile{
 			Name: u.Name,
 		}, nil
@@ -52,7 +51,7 @@ func (s *inmemService) GetProfile(c context.Context, id uuid.UUID) (Profile, err
 	return Profile{}, ErrNotFound
 }
 
-func (s *inmemService) CreateUser(c context.Context, user User) (error) {
+func (s *inmemService) CreateUser(user User) (error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	for _, u := range s.m {
@@ -60,21 +59,20 @@ func (s *inmemService) CreateUser(c context.Context, user User) (error) {
 			return ErrUserExists
 		}
 	}
-	s.m[user.ID] = &user
+	s.m[user.ID.String()] = &user
 	return nil
 }
 
 func (s *inmemService) UpdateUser(c context.Context, user User) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	s.m[user.ID] = &user
+	s.m[user.ID.String()] = &user
 	return nil
 }
 
 func (s *inmemService) Authenticate(email string, password string) (User, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
-	email = strings.ToLower(email)
 	for id, u := range s.m {
 		if u.Email == email {
 			err := bcrypt.CompareHashAndPassword(s.p[id], []byte(password))
@@ -87,13 +85,13 @@ func (s *inmemService) Authenticate(email string, password string) (User, error)
 	return User{}, ErrWrongEmail
 }
 
-func (s *inmemService) SetPassword(c context.Context, userId uuid.UUID, password string) error {
+func (s *inmemService) SetPassword(userId uuid.UUID, password string) error {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	s.p[userId] = hashed
+	s.p[userId.String()] = hashed
 	return nil
 }
