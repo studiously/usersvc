@@ -1,0 +1,3 @@
+FROM alpine
+ADD usersvc /go/bin/usersvc
+ENTRYPOINT go/bin/usersvc

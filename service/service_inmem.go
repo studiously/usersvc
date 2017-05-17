@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"sync"
 
 	"github.com/google/uuid"
@@ -40,7 +39,7 @@ func (s *inmemService) GetUser(id uuid.UUID) (User, error) {
 	return User{}, ErrNotFound
 }
 
-func (s *inmemService) GetProfile(c context.Context, id uuid.UUID) (Profile, error) {
+func (s *inmemService) GetProfile(id uuid.UUID) (Profile, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 	if u, ok := s.m[id.String()]; ok {
@@ -63,7 +62,7 @@ func (s *inmemService) CreateUser(user User) (error) {
 	return nil
 }
 
-func (s *inmemService) UpdateUser(c context.Context, user User) error {
+func (s *inmemService) UpdateUser(user User) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	s.m[user.ID.String()] = &user

@@ -51,7 +51,7 @@ func (r getUserResponse) error() error {
 func MakeGetProfileEndpoint(s Service) endpoint.Endpoint {
 	return func(c context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(getProfileRequest)
-		profile, e := s.GetProfile(c, req.UserId)
+		profile, e := s.GetProfile(req.UserId)
 		return getProfileResponse{e, profile}, nil
 	}
 }
@@ -72,7 +72,7 @@ func (r getProfileResponse) error() error {
 func MakeUpdateUserEndpoint(s Service) endpoint.Endpoint {
 	return func(c context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(updateUserRequest)
-		e := s.UpdateUser(c, req.User)
+		e := s.UpdateUser(req.User)
 		return updateUserResponse{e}, nil
 	}
 }

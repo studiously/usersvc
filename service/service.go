@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"github.com/google/uuid"
 )
@@ -18,9 +17,9 @@ var (
 
 type Service interface {
 	GetUser(id uuid.UUID) (User, error)
-	GetProfile(c context.Context, id uuid.UUID) (Profile, error)
+	GetProfile(id uuid.UUID) (Profile, error)
 	CreateUser(user User) (err error)
-	UpdateUser(c context.Context, user User) error
+	UpdateUser(user User) error
 	SetPassword(userId uuid.UUID, password string) error
 	Authenticate(email string, password string) (User, error)
 }

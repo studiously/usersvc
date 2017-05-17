@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"database/sql"
 
 	"github.com/Studiously/usersvc/models"
@@ -33,7 +32,7 @@ func (s *persistentService) GetUser(id uuid.UUID) (User, error) {
 	}, nil
 }
 
-func (s *persistentService) GetProfile(c context.Context, id uuid.UUID) (Profile, error) {
+func (s *persistentService) GetProfile(id uuid.UUID) (Profile, error) {
 	u, err := models.UserByID(s.DB, id)
 	if err != nil {
 		return Profile{}, err
@@ -57,7 +56,7 @@ func (s *persistentService) CreateUser(user User) (err error) {
 	return
 }
 
-func (s *persistentService) UpdateUser(c context.Context, user User) error {
+func (s *persistentService) UpdateUser(user User) error {
 	u := &models.User{
 		ID:     user.ID,
 		Name:   user.Name,

@@ -1,0 +1,43 @@
+version: "3"
+
+app:
+  dockerfile: Dockerfile.scratch
+  volumes:
+    - .:/go/src/github.com/Studiously/usersvc
+  working_dir: /go/src/github.com/Studiously/usersvc
+  ports:
+    - "80:80"
+  depends_on:
+  - hydra
+  - db
+  env:
+  - "DATABASE_DRIVER=postgres"
+  - "DATABASE_CONFIG=postgres://usersvc:abcdefg12345678@db:5432/usersvc"
+  command:
+hydra_setup:
+  image: oryd/hydra
+  working_dir: /go/src/github.com/Studiously/usersvc
+  volumes:
+        - .:/go/src/github.com/Studiously/usersvc
+  command: bash -c "hydra connect --id demo --secret demo --url http://hydra: hydra clients import client.json && hydra policies create -f policy.json && hydra policies create -f policy_2.json"
+hydra:
+  image: oryd/hydra
+  command: ["hydra", "host", "--dangerous-force-http"]
+  volumes:
+      - .:/go/src/github.com/Studiously/usersvc
+  working_dir: /go/src/github.com/Studiously/usersvc
+  environment:
+    - "FORCE_ROOT_CLIENT_CREDENTIALS=demo:demo"
+    - "CONSENT_URL=http://app:80/consent"
+    - "DATABASE_URL=postgres://usersvc:abcdefg12345678@db:5432/usersvc?sslmode=disable"
+  depends_on:
+  - db
+  ports:
+  - "4444:4444"
+db:
+  image: postgres:alpine
+  env:
+    - "POSTGRES_USER=usersvc"
+    - "POSTGRES_PASSWORD=abcdefg12345678"
+  ports:
+    - "5432:5432"
