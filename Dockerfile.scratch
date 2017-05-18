@@ -1,0 +1,4 @@
+FROM scratch
+ADD usersvc-linux /usersvc
+ENTRYPOINT ["/usersvc"]
+EXPOSE 8080

@@ -26,18 +26,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/Studiously/usersvc/ddl"
-	"github.com/Studiously/usersvc/service"
 	"github.com/go-kit/kit/log"
 	"github.com/ory/common/env"
 	"github.com/ory/hydra/sdk"
 	"github.com/rubenv/sql-migrate"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/studiously/usersvc/ddl"
+	"github.com/studiously/usersvc/service"
 )
 
 var cfgFile string
@@ -61,10 +62,12 @@ var RootCmd = &cobra.Command{
 			logger = log.With(logger, "caller", log.DefaultCaller)
 		}
 		// Set up Hydra
+		tlsVerify, _ := strconv.ParseBool(env.Getenv("HYDRA_TLS_VERIFY", "false"))
 		client, err := sdk.Connect(
 			sdk.ClientID(env.Getenv("HYDRA_CLIENT_ID", "consent")),
 			sdk.ClientSecret(env.Getenv("HYDRA_CLIENT_SECRET", "demovo")),
 			sdk.ClusterURL(env.Getenv("HYDRA_CLUSTER_URL", "http://localhost:4444")),
+			sdk.SkipTLSVerify(tlsVerify),
 		)
 		if err != nil {
 			logrus.WithError(err).Fatal("could not connect to Hydra")

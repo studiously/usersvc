@@ -3,7 +3,7 @@ package service
 import (
 	"database/sql"
 
-	"github.com/Studiously/usersvc/models"
+	"github.com/studiously/usersvc/models"
 	"github.com/google/uuid"
 	"github.com/ory/hydra/sdk"
 	"golang.org/x/crypto/bcrypt"

@@ -10,8 +10,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/Studiously/usersvc/ddl"
-	"github.com/Studiously/usersvc/templates"
 	lg"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/google/uuid"
@@ -21,6 +19,8 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/ory/common/env"
 	"github.com/ory/hydra/sdk"
+	"github.com/studiously/usersvc/ddl"
+	"github.com/studiously/usersvc/templates"
 )
 
 var (
@@ -58,7 +58,7 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 	//	options...
 	//)))
 
-	r.Methods("GET").Path("/").HandlerFunc(func (w http.ResponseWriter, r *http.Request){
+	r.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/me", http.StatusPermanentRedirect)
 	})
 
@@ -277,8 +277,8 @@ func MakePostLogin(s Service) http.Handler {
 			err := r.ParseForm()
 			if err != nil {
 				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
-					"error":     err.Error(),
-					"challenge": r.URL.Query().Get("challenge"),
+					"error":          err.Error(),
+					"challenge":      r.URL.Query().Get("challenge"),
 					csrf.TemplateTag: csrf.TemplateField(r),
 
 				})
