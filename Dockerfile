@@ -1,5 +1,5 @@
-FROM golang:alpine
-ADD . .
-RUN go install .
+FROM golang
+ADD . /go/src/github.com/studiously/usersvc
+RUN go install github.com/studiously/usersvc
 ENTRYPOINT /go/bin/usersvc
-EXPOSE 8080:8080
+EXPOSE 8080

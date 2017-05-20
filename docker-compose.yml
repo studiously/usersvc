@@ -1,0 +1,31 @@
+version: "2.1"
+
+services:
+  usersvc:
+      env_file: .env
+      build: .
+      image: studiously/usersvc
+      depends_on:
+        postgres:
+          condition: service_healthy
+      environment:
+        HYDRA_CLUSTER_URL: "${HYDRA_CLUSTER_URL}"
+        DATABASE_DRIVER: "postgres"
+        DATABASE_CONFIG: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgr$
+        HYDRA_CLIENT_ID: "${HYDRA_CLIENT_ID}"
+        HYDRA_CLIENT_SECRET: "${HYDRA_CLIENT_SECRET}"
+      ports:
+      - "${BIND_PORT}:8080"
+  postgres:
+      env_file: .env
+      image: postgres:alpine
+      restart: always
+      volumes:
+      - "./:/var/lib/postgresql"
+      ports:
+      - "5432"
+      healthcheck:
+        test: ["CMD-SHELL", "psql -h 'localhost' -U 'postgres' -c '\\l'"]
+        interval: 5s
+        timeout: 5s
+        retries: 10
