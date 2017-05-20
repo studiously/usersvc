@@ -325,6 +325,7 @@ func MakeGetMe(s Service, client *sdk.Client) http.Handler {
 		user, err := s.GetUser(uid)
 		if err != nil {
 			http.Redirect(w, r, "/logout", http.StatusFound)
+			return
 		}
 		tmpls.ExecuteTemplate(w, "me.html", map[string]interface{}{
 			"user": user,
@@ -434,7 +435,7 @@ func codeFrom(err error) int {
 
 func authenticated(r *http.Request) uuid.UUID {
 	session, _ := store.Get(r, sessionName)
-	u, ok := session.Values[sessionName].(string);
+	u, ok := session.Values["user"].(string);
 	if !ok {
 		return uuid.Nil
 	}
