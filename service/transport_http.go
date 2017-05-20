@@ -7,6 +7,7 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/ory/hydra/sdk"
 	"github.com/studiously/usersvc/ddl"
 	"github.com/studiously/usersvc/templates"
-	"os"
 )
 
 var (
@@ -299,7 +299,6 @@ func MakePostLogin(s Service) http.Handler {
 			}
 			session, _ := store.Get(r, sessionName)
 			session.Values["user"] = user.ID.String()
-
 			if err := store.Save(r, w, session); err != nil {
 				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
 					"error":          ErrPersistCookie.Error(),
@@ -435,7 +434,7 @@ func codeFrom(err error) int {
 
 func authenticated(r *http.Request) uuid.UUID {
 	session, _ := store.Get(r, sessionName)
-	u, ok := session.Values["user"].(string);
+	u, ok := session.Values[sessionName].(string);
 	if !ok {
 		return uuid.Nil
 	}

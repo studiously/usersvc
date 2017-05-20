@@ -7,12 +7,10 @@
   "effect": "allow",
   "id": "consent_keys",
   "resources": [
-    "rn:hydra:keys:hydra.consent.challenge:public",
     "rn:hydra:keys:hydra.consent.challenge:private",
-    "rn:hydra:keys:hydra.consent.response:private",
-    "rn:hydra:keys:hydra.consent.response:public"
+    "rn:hydra:keys:hydra.consent.response:private"
   ],
   "subjects": [
-    "consent"
+    "usersvc"
   ]
 }
