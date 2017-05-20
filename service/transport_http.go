@@ -21,6 +21,7 @@ import (
 	"github.com/ory/hydra/sdk"
 	"github.com/studiously/usersvc/ddl"
 	"github.com/studiously/usersvc/templates"
+	"os"
 )
 
 var (
@@ -317,7 +318,7 @@ func MakeGetMe(s Service, client *sdk.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if authenticated(r) == uuid.Nil {
 			nonce := rand_str(24)
-			var authUrl = client.OAuth2Config("http://localhost:8080/me", "offline", "nonconsentual", "openid").AuthCodeURL(nonce) + "&nonce=" + nonce
+			var authUrl = client.OAuth2Config(os.Getenv("REDIRECT_URL"), "offline", "nonconsentual", "openid").AuthCodeURL(nonce) + "&nonce=" + nonce
 			http.Redirect(w, r, authUrl, http.StatusFound)
 			return
 		}

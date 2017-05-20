@@ -17,5 +17,6 @@
     "id_token",
     "code"
   ],
-  "scope": "hydra nonconsentual offline openid"
+  "scope": "hydra nonconsentual offline openid",
+  "cmd": "hydra clients create --id=usersvc --secret=0Rt8mPCf0tElp63GWx4eTUi2F7iy2KlAp6DTs7j6qvz62ShYXnLPQC2IgureRkL -n usersvc -c https://auth.studiously.co/me -g client_credentials,implicit,refresh_token,authorization_code,password -r id_token,code -a hydra,nonconsentual,offline,openid"
 }
