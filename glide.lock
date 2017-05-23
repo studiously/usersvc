@@ -1,0 +1,40 @@
+hash: 6cefbb2c7d06c6c85156ee5096991674ade6ff451bbba41bf7952b91a8843ab2
+updated: 2017-05-23T15:45:21.166996443-05:00
+imports:
+- name: github.com/go-kit/kit
+  version: fadad6fffe0466b19df9efd9acde5c9a52df5fa4
+  subpackages:
+  - endpoint
+  - log
+  - transport/http
+- name: github.com/google/uuid
+  version: 064e2069ce9c359c118179501254f67d7d37ba24
+- name: github.com/gorilla/csrf
+  version: 69581736821c33d85bbf378f42f6ad864dbd85de
+- name: github.com/gorilla/mux
+  version: bcd8bc72b08df0f70df986b97f95590779502d31
+- name: github.com/gorilla/securecookie
+  version: 667fe4e3466a040b780561fe9b51a83a3753eefc
+- name: github.com/gorilla/sessions
+  version: ca9ada44574153444b00d3fd9c8559e4cc95f896
+- name: github.com/ory/common
+  version: b6357395e30805e2ad1f6d8fb759fa2b7146d8da
+  subpackages:
+  - env
+- name: github.com/ory/hydra
+  version: 7d6a6e7ad3d89694ea3b2f112ea72265ae8000ec
+  subpackages:
+  - sdk
+- name: github.com/rubenv/sql-migrate
+  version: 42c30aabf72921b83678a3d0680fd6cd46682f1b
+- name: github.com/Sirupsen/logrus
+  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
+- name: github.com/spf13/cobra
+  version: ca57f0f5dba473a8a58765d16d7e811fb8027add
+- name: github.com/spf13/viper
+  version: 0967fc9aceab2ce9da34061253ac10fb99bba5b2
+- name: golang.org/x/crypto
+  version: 7e9105388ebff089b3f99f0ef676ea55a6da3a7e
+  subpackages:
+  - bcrypt
+testImports: []
