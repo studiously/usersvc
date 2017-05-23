@@ -7,10 +7,10 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 
+	"github.com/Sirupsen/logrus"
 	lg"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/google/uuid"
@@ -32,8 +32,9 @@ var (
 	ErrBadRouting    = errors.New("Inconsistent mapping between route and handler (programmer error).")
 	ErrPersistCookie = errors.New("Failed to add a cookie. Make sure to enable cookies.")
 	ErrInternal      = errors.New("We're having a problem on our end. Hang tight and we'll get it fixed.")
-	ErrNoChallenge   = errors.New("Endpoint was called without a consent challenge")
+	ErrNoChallenge   = errors.New("no challenge present")
 	ErrBadRequest    = errors.New("There was an issue parsing the request.")
+	ErrBadToken      = errors.New("Could not exchange token.")
 	//ErrNotVerified   = errors.New("The consent challenge could not be verified")
 )
 
@@ -59,9 +60,9 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 	//	options...
 	//)))
 
-	r.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/me", http.StatusPermanentRedirect)
-	})
+	//r.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//	http.Redirect(w, r, "/me", http.StatusPermanentRedirect)
+	//})
 
 	r.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(
 		e.GetUserEndpoint,
@@ -70,19 +71,19 @@ func MakeHTTPHandler(s Service, client *sdk.Client, logger lg.Logger) http.Handl
 		options...
 	))
 
-	r.Methods("GET").Path("/profiles/{userId}").Handler(httptransport.NewServer(
+	r.Methods("GET").Path("/users/{id}/public").Handler(httptransport.NewServer(
 		e.GetProfileEndpoint,
 		decodeGetProfileRequest,
 		encodeResponse,
 		options...
 	))
 
-	r.Methods("GET").Path("/me").Handler(MakeGetMe(s, client))
+	//r.Methods("GET").Path("/me").Handler(MakeGetMe(s, client))
 
 	r.Methods("GET").Path("/register").Handler(MakeGetRegister())
 	r.Methods("POST").Path("/register").Handler(MakePostRegister(s))
 
-	r.Methods("GET").Path("/login").Handler(MakeGetLogin(client))
+	r.Methods("GET").Path("/login").Handler(MakeGetLogin())
 	r.Methods("POST").Path("/login").Handler(MakePostLogin(s))
 
 	r.Methods("GET").Path("/consent").Handler(MakeGetConsent(client))
@@ -109,11 +110,8 @@ func MakePostRegister(s Service) http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 			err := r.ParseForm()
 			if err != nil {
-				tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
-					csrf.TemplateTag: csrf.TemplateField(r),
-					"challenge":      r.URL.Query().Get("challenge"),
-					"error":          ErrBadRequest.Error(),
-				})
+				logrus.WithError(err).Error("failed to parse form")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			user := User{
@@ -123,6 +121,7 @@ func MakePostRegister(s Service) http.Handler {
 			}
 			err = s.CreateUser(user)
 			if err != nil {
+				logrus.WithError(err).Error("failed to create user")
 				tmpls.ExecuteTemplate(w, "register.html", map[string]interface{}{
 					csrf.TemplateTag: csrf.TemplateField(r),
 					"challenge":      r.URL.Query().Get("challenge"),
@@ -149,26 +148,28 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 			// First, check if hydra returned an error.
 			err := r.URL.Query().Get("error")
 			if err != "" {
-				// Uh oh! There be a problem here. We can just render the error template here.
-				tmpls.ExecuteTemplate(w, "error.html", map[string]interface{}{
-					"error":            err,
-					"errorDescription": r.URL.Query().Get("error_description"),
-				})
+				// Uh oh! There be a problem... We can just render the error template here.
+				logrus.WithFields(logrus.Fields{
+					"error":             r.URL.Query().Get("error"),
+					"error_description": r.URL.Query().Get("error_description"),
+				}).Error("hydra error")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			// Get the challenge from the URL.
 			challenge := r.URL.Query().Get("challenge")
 			// Check that the challenge exists.
 			if challenge == "" {
-				// Without a challenge, we can't authenticate--default to redirecting the user to /me to initialize the process. This makes it work even without a challenge--it just defaults to the user profile app.
-				http.Redirect(w, r, "/me", http.StatusFound)
+				// TODO default login flow without an OAuth2 Client
+				logrus.Error("consent endpoint accessed without a challenge")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			// Check that the challenge is OK.
 			claims, err2 := client.Consent.VerifyChallenge(challenge)
 			if err2 != nil {
-				// If the challenge is not OK, redirect to /me again.
-				http.Redirect(w, r, "/me", http.StatusFound)
+				logrus.WithError(err2).Error("challenge could not be verified")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			// Check if the user is authenticated.
@@ -190,7 +191,8 @@ func MakeGetConsent(client *sdk.Client) http.Handler {
 				})
 				// If there's a problem, we need to abort and render the error page.
 				if err != nil {
-					encodeError(nil, err, w)
+					logrus.WithError(err).Error("cannot generate response to challenge")
+					tmpls.ExecuteTemplate(w, "error.html", nil)
 					return
 				}
 				http.Redirect(w, r, redirectUrl, http.StatusFound)
@@ -209,7 +211,8 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		challenge := r.URL.Query().Get("challenge")
 		if challenge == "" {
-			encodeError(nil, ErrNoChallenge, w)
+			logrus.Error("consent endpoint called without challenge")
+			tmpls.ExecuteTemplate(w, "error.html", nil)
 			return
 		}
 
@@ -220,7 +223,8 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			encodeError(nil, err, w)
+			logrus.WithError(err).Error("cannot parse form")
+			tmpls.ExecuteTemplate(w, "error.html", nil)
 			return
 		}
 
@@ -239,7 +243,8 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 			Scopes: grantedScopes,
 		})
 		if err != nil {
-			encodeError(nil, err, w)
+			logrus.WithError(err).Error("cannot generate response to challenge")
+			tmpls.ExecuteTemplate(w, "error.html", nil)
 			return
 		}
 
@@ -247,13 +252,9 @@ func MakePostConsent(client *sdk.Client) http.Handler {
 	}))
 }
 
-func MakeGetLogin(client *sdk.Client) http.Handler {
+func MakeGetLogin() http.Handler {
 	return CSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		challenge := r.FormValue("challenge")
-		//if challenge == "" {
-		//	http.Redirect(w, r, "/me", http.StatusFound)
-		//	return
-		//}
 		// If the user is already authenticated, redirect to the consent phase.
 		session, _ := store.Get(r, sessionName)
 		_, ok := session.Values["user"]
@@ -277,12 +278,8 @@ func MakePostLogin(s Service) http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 			err := r.ParseForm()
 			if err != nil {
-				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
-					"error":          err.Error(),
-					"challenge":      r.URL.Query().Get("challenge"),
-					csrf.TemplateTag: csrf.TemplateField(r),
-
-				})
+				logrus.WithError(err).Error("could not parse form")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			user, err := s.Authenticate(
@@ -300,11 +297,8 @@ func MakePostLogin(s Service) http.Handler {
 			session, _ := store.Get(r, sessionName)
 			session.Values["user"] = user.ID.String()
 			if err := store.Save(r, w, session); err != nil {
-				tmpls.ExecuteTemplate(w, "login.html", map[string]interface{}{
-					"error":          ErrPersistCookie.Error(),
-					"challenge":      r.URL.Query().Get("challenge"),
-					csrf.TemplateTag: csrf.TemplateField(r),
-				})
+				logrus.WithError(err).Error("could not save session")
+				tmpls.ExecuteTemplate(w, "error.html", nil)
 				return
 			}
 			challenge := r.FormValue("challenge")
@@ -313,49 +307,46 @@ func MakePostLogin(s Service) http.Handler {
 	))
 }
 
-func MakeGetMe(s Service, client *sdk.Client) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if authenticated(r) == uuid.Nil {
-			nonce := rand_str(24)
-			var authUrl = client.OAuth2Config(os.Getenv("REDIRECT_URL"), "offline", "nonconsentual", "openid").AuthCodeURL(nonce) + "&nonce=" + nonce
-			http.Redirect(w, r, authUrl, http.StatusFound)
-			return
-		}
-		uid := authenticated(r)
-		user, err := s.GetUser(uid)
-		if err != nil {
-			http.Redirect(w, r, "/logout", http.StatusFound)
-			return
-		}
-		tmpls.ExecuteTemplate(w, "me.html", map[string]interface{}{
-			"user": user,
-		})
-	})
-}
+//func MakeGetMe(s Service, client *sdk.Client) http.Handler {
+//	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//		code := r.URL.Query().Get("code")
+//		if code == "" {
+//			nonce := rand_str(24)
+//			var authUrl = client.OAuth2Config(os.Getenv("REDIRECT_URL"), "offline", "nonconsentual", "openid").AuthCodeURL(nonce) + "&nonce=" + nonce
+//			http.Redirect(w, r, authUrl, http.StatusFound)
+//			return
+//		}
+//		token, err := client.OAuth2Config("http://localhost:4445/callback").Exchange(context.Background(), r.URL.Query().Get("code"))
+//
+//		if err != nil {
+//			encodeError(nil, ErrBadToken, w)
+//			return
+//		}
+//		user, err := s.GetUser()
+//		if err != nil {
+//			http.Redirect(w, r, "/logout", http.StatusFound)
+//			return
+//		}
+//		tmpls.ExecuteTemplate(w, "me.html", map[string]interface{}{
+//			"user": user,
+//		})
+//	})
+//}
+
 func MakeGetLogout() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, sessionName)
 		delete(session.Values, "user")
+
 		session.Save(r, w)
-		http.Redirect(w, r, "/me", http.StatusFound)
+
+		if r.URL.Query().Get("redirect") == "" {
+			tmpls.ExecuteTemplate(w, "logout.html", nil)
+		} else {
+			http.Redirect(w, r, r.URL.Query().Get("redirect"), http.StatusFound)
+		}
 	})
 }
-
-//func decodeCreateUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
-//	//var req createUserRequest
-//	//json.NewDecoder(r.Body).Decode(&req)
-//	//return req, err
-//	err = r.ParseForm()
-//	if err != nil {
-//		return
-//	}
-//	request = createUserRequest{
-//		Name:     r.FormValue("name"),
-//		Email:    r.FormValue("email"),
-//		Password: r.FormValue("password"),
-//	}
-//	return
-//}
 
 func decodeGetUserRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
 	vars := mux.Vars(r)
@@ -370,7 +361,7 @@ func decodeGetUserRequest(_ context.Context, r *http.Request) (request interface
 
 func decodeGetProfileRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
 	vars := mux.Vars(r)
-	sid, ok := vars["userId"]
+	sid, ok := vars["id"]
 	if !ok {
 		return nil, ErrBadRouting
 	}
@@ -378,15 +369,6 @@ func decodeGetProfileRequest(_ context.Context, r *http.Request) (request interf
 	request = getProfileRequest{UserId: id}
 	return
 }
-
-func renderError(w http.ResponseWriter, error, description string) {
-
-}
-
-//func decodeAuthenticateRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
-//
-//	return
-//}
 
 // errorer is implemented by all concrete response types that may contain
 // errors. It allows us to change the HTTP response code without needing to
@@ -435,11 +417,11 @@ func codeFrom(err error) int {
 
 func authenticated(r *http.Request) uuid.UUID {
 	session, _ := store.Get(r, sessionName)
-	u, ok := session.Values["user"].(string);
+	u, ok := session.Values["user"].(string)
 	if !ok {
 		return uuid.Nil
 	}
-	user, err := uuid.Parse(u);
+	user, err := uuid.Parse(u)
 	if err != nil {
 		return uuid.Nil
 	}

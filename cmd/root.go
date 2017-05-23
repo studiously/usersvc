@@ -51,7 +51,9 @@ var RootCmd = &cobra.Command{
 	Short: "Create a new instance of the user service.",
 	Long: `usersvc is a microservice for user management and local authentication for Studiously.
 
-	While usersvc handles migrations, it is recommended that the database be manually inspected to ensure proper functionality.`,
+	While usersvc handles migrations, it is recommended that the database be manually inspected to ensure proper functionality.
+
+	Set HYDRA_CLIENT_ID, HYDRA_CLIENT_SECRET, and HYDRA_CLUSTER URL to ensure proper functionality.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
@@ -62,12 +64,10 @@ var RootCmd = &cobra.Command{
 			logger = log.With(logger, "caller", log.DefaultCaller)
 		}
 		// Set up Hydra
-		tlsVerify, _ := strconv.ParseBool(env.Getenv("HYDRA_TLS_VERIFY", "false"))
 		client, err := sdk.Connect(
-			sdk.ClientID(env.Getenv("HYDRA_CLIENT_ID", "consent")),
-			sdk.ClientSecret(env.Getenv("HYDRA_CLIENT_SECRET", "demovo")),
-			sdk.ClusterURL(env.Getenv("HYDRA_CLUSTER_URL", "http://localhost:4444")),
-			sdk.SkipTLSVerify(tlsVerify),
+			sdk.ClientID(os.Getenv("HYDRA_CLIENT_ID")),
+			sdk.ClientSecret(os.Getenv("HYDRA_CLIENT_SECRET")),
+			sdk.ClusterURL(os.Getenv("HYDRA_CLUSTER_URL")),
 		)
 		if err != nil {
 			logrus.WithError(err).Fatal("could not connect to Hydra")
