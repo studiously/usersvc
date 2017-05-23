@@ -26,13 +26,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/go-kit/kit/log"
-	"github.com/ory/common/env"
 	"github.com/ory/hydra/sdk"
 	"github.com/rubenv/sql-migrate"
 	"github.com/spf13/cobra"
