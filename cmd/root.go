@@ -41,7 +41,7 @@ import (
 
 var cfgFile string
 var addr string
-var dry bool = true
+var dry bool = false
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
