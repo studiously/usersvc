@@ -14,7 +14,7 @@ services:
         DATABASE_CONFIG: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}"
         HYDRA_CLIENT_ID: "${HYDRA_CLIENT_ID}"
         HYDRA_CLIENT_SECRET: "${HYDRA_CLIENT_SECRET}"
-        REDIRECT_URL: "${REDIRECT_URL}"
+#        REDIRECT_URL: "${REDIRECT_URL}"
       ports:
       - "${BIND_PORT}:8080"
   postgres:

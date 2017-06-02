@@ -21,96 +21,75 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"strings"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/go-kit/kit/log"
-	"github.com/ory/hydra/sdk"
-	"github.com/rubenv/sql-migrate"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/studiously/usersvc/ddl"
-	"github.com/studiously/usersvc/service"
 )
 
 var cfgFile string
-var addr string
-var dry bool = false
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "usersvc",
-	Short: "Create a new instance of the user service.",
-	Long: `usersvc is a microservice for user management and local authentication for Studiously.
-
-	While usersvc handles migrations, it is recommended that the database be manually inspected to ensure proper functionality.
-
-	Set HYDRA_CLIENT_ID, HYDRA_CLIENT_SECRET, and HYDRA_CLUSTER URL to ensure proper functionality.`,
+	Short: "User service for Studiously.",
+	Long:  `usersvc is an identity provider microservice for user management and local authentication in Studiously.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
-		var logger log.Logger
-		{
-			logger = log.NewLogfmtLogger(logrus.StandardLogger().Out)
-			logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-			logger = log.With(logger, "caller", log.DefaultCaller)
-		}
-		// Set up Hydra
-		client, err := sdk.Connect(
-			sdk.ClientID(os.Getenv("HYDRA_CLIENT_ID")),
-			sdk.ClientSecret(os.Getenv("HYDRA_CLIENT_SECRET")),
-			sdk.ClusterURL(os.Getenv("HYDRA_CLUSTER_URL")),
-		)
-		if err != nil {
-			logrus.WithError(err).Fatal("could not connect to Hydra")
-		}
-		var s service.Service
-		{
-			switch dry {
-			case false:
-				// Set up database
-				var driver = os.Getenv("DATABASE_DRIVER")
-				var config = os.Getenv("DATABASE_CONFIG")
-
-				db, err := sql.Open(driver, config)
-				if err != nil {
-					logrus.Fatalln("database connection failed", err)
-				}
-				if err := pingDatabase(db); err != nil {
-					logrus.Errorln(err)
-					logrus.Fatalln("database ping attempts failed")
-				}
-				if err := setupDatabase(driver, db); err != nil {
-					logrus.Errorln(err)
-					logrus.Fatalln("migration failed")
-				}
-				s = service.NewPersistentService(db, client)
-			case true:
-				s = service.NewInmemService()
-			}
-		}
-		var h = service.MakeHTTPHandler(s, client, logger)
-
-		errs := make(chan error)
-		go func() {
-			c := make(chan os.Signal, 100)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-			errs <- fmt.Errorf("%s", <-c)
-		}()
-
-		go func() {
-			logger.Log("transport", "HTTP", "addr", addr)
-			errs <- http.ListenAndServe(addr, h)
-		}()
-
-		logger.Log("exit", <-errs)
-	},
+	//Run: func(cmd *cobra.Command, args []string) {
+	//var logger log.Logger
+	//{
+	//	logger = log.NewLogfmtLogger(logrus.StandardLogger().Out)
+	//	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+	//	logger = log.With(logger, "caller", log.DefaultCaller)
+	//}
+	//// Set up Hydra
+	//client, err := sdk.Connect(
+	//	sdk.ClientID(os.Getenv("HYDRA_CLIENT_ID")),
+	//	sdk.ClientSecret(os.Getenv("HYDRA_CLIENT_SECRET")),
+	//	sdk.ClusterURL(os.Getenv("HYDRA_CLUSTER_URL")),
+	//)
+	//if err != nil {
+	//	logrus.WithError(err).Fatal("could not connect to Hydra")
+	//}
+	//var s usersvc.Service
+	//{
+	//	// Set up database
+	//	var driver = os.Getenv("DATABASE_DRIVER")
+	//	var config = os.Getenv("DATABASE_CONFIG")
+	//
+	//	db, err := sql.Open(driver, config)
+	//	if err != nil {
+	//		logrus.Fatalln("database connection failed", err)
+	//	}
+	//	if err := pingDatabase(db); err != nil {
+	//		logrus.Errorln(err)
+	//		logrus.Fatalln("database ping attempts failed")
+	//	}
+	//	if err := setupDatabase(driver, db); err != nil {
+	//		logrus.Errorln(err)
+	//		logrus.Fatalln("migration failed")
+	//	}
+	//	s = usersvc.New(db, client)
+	//}
+	//var h = usersvc.MakeHTTPHandler(s, client, logger)
+	//
+	//errs := make(chan error)
+	//go func() {
+	//	c := make(chan os.Signal, 100)
+	//	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	//	errs <- fmt.Errorf("%s", <-c)
+	//}()
+	//
+	//go func() {
+	//	logger.Log("transport", "HTTP", "addr", addr)
+	//	errs <- http.ListenAndServe(addr, h)
+	//}()
+	//
+	//logger.Log("exit", <-errs)
+	//},
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
@@ -129,12 +108,7 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.usersvc.yaml)")
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	//RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	RootCmd.PersistentFlags().StringVarP(&addr, "addr", "a", ":8080", "HTTP bind address")
-	RootCmd.PersistentFlags().BoolVarP(&dry, "dry", "d", true, "Uses an in-memory testing store for a dry run.")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.unitsvc.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -144,34 +118,12 @@ func initConfig() {
 	}
 
 	viper.SetConfigName(".usersvc") // name of config file (without extension)
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME") // adding home directory as first search path
-	viper.AutomaticEnv()         // read in environment variables that match
+	viper.AddConfigPath("$HOME")    // adding home directory as first search path
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
-}
-
-func setupDatabase(driver string, db *sql.DB) error {
-	var migrations = &migrate.AssetMigrationSource{
-		Asset:    ddl.Asset,
-		AssetDir: ddl.AssetDir,
-		Dir:      driver,
-	}
-	_, err := migrate.Exec(db, driver, migrations, migrate.Up)
-	return err
-}
-
-func pingDatabase(db *sql.DB) (err error) {
-	for i := 0; i < 30; i++ {
-		err = db.Ping()
-		if err == nil {
-			return
-		}
-		logrus.Infof("database ping failed. retry in 1s")
-		time.Sleep(time.Second)
-	}
-	return
 }

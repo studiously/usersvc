@@ -1,4 +1,3 @@
 .idea/
-usersvc
-vendor/
 .env
+dist/

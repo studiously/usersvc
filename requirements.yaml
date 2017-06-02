@@ -1,0 +1,3 @@
+dependencies:
+- name: hydra
+  version: 0.7.10

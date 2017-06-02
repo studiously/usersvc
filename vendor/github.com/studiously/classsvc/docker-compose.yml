@@ -1,0 +1,30 @@
+version: "3"
+services:
+  db:
+    env_file: .env
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - postgres:/var/lib/postgresql
+    ports:
+    - "5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+  classsvc:
+    build: .
+    env_file: .env
+    image: studiously/classsvc
+    ports:
+      - "$BIND_PORT:9392"
+    environment:
+      DATABASE_DRIVER: "postgres"
+      DATABASE_CONFIG: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}"
+      HYDRA_CLIENT_ID: "${HYDRA_CLIENT_ID}"
+      HYDRA_CLIENT_SECRET: "${HYDRA_CLIENT_SECRET}"
+      HYDRA_CLUSTER_URL: "${HYDRA_CLUSTER_URL}"
+    depends_on:
+      - db
+volumes:
+  postgres:

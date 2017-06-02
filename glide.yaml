@@ -1,34 +1,48 @@
 package: github.com/studiously/usersvc
 import:
-- package: github.com/Sirupsen/logrus
-  version: ~0.11.5
 - package: github.com/go-kit/kit
-  version: ~0.4.0
+  version: ^0.4.0
   subpackages:
   - endpoint
   - log
+  - metrics
+  - metrics/prometheus
   - transport/http
 - package: github.com/google/uuid
-  version: ~0.2.0
+  version: ^0.2.0
 - package: github.com/gorilla/csrf
-  version: ~1.5.0
+  version: ^1.5.0
 - package: github.com/gorilla/mux
-  version: ~1.4.0
+  version: ^1.4.0
 - package: github.com/gorilla/securecookie
-  version: ~1.1.0
+  version: ^1.1.0
 - package: github.com/gorilla/sessions
-  version: ~1.1.0
+  version: ^1.1.0
+- package: github.com/nats-io/go-nats
+  version: ^1.2.2
 - package: github.com/ory/common
-  version: ~0.4.0
+  version: ^0.4.0
   subpackages:
   - env
 - package: github.com/ory/hydra
-  version: ~0.8.3
+  version: ^0.8.5
   subpackages:
+  - oauth2
   - sdk
+- package: github.com/prometheus/client_golang
+  version: ^0.8.0
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
 - package: github.com/rubenv/sql-migrate
 - package: github.com/spf13/cobra
 - package: github.com/spf13/viper
+- package: github.com/studiously/classsvc
+  version: ^0.1.0
+  subpackages:
+  - classsvc
+- package: github.com/studiously/introspector
+- package: github.com/studiously/svcerror
 - package: golang.org/x/crypto
   subpackages:
   - bcrypt

@@ -1,0 +1,14 @@
+name: usersvc
+version: 0.0.1
+description: User service for Studiously
+keywords:
+- studiously
+- oauth2
+- hydra
+home: https://studiously.co
+sources:
+- https://github.com/studiously/usersvc
+maintainers:
+- name: Meyer Zinn
+  email: meyerzinn@gmail.com
+appVersion: 0.0.1
