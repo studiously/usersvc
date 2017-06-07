@@ -18,8 +18,6 @@ var (
 	ErrDeleteOwner   = svcerror.New(codes.DeleteOwner, "cannot delete user while it is an owner")
 )
 
-type Middleware func(Service) Service
-
 type Service interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (name string, err error)
 	GetUserInfo(ctx context.Context) (user *models.User, err error)
@@ -29,4 +27,5 @@ type Service interface {
 	SetPassword(ctx context.Context, password string) error
 	Authenticate(email string, password string) (uuid.UUID, error)
 	DeleteUser(ctx context.Context) error
+	ResetPassword(ctx context.Context, email string) error
 }

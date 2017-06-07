@@ -1,0 +1,17 @@
+language: go
+go:
+  - "1.8"
+  - "1.8.x"
+  - "master"
+  - "tip"
+
+services:
+  - docker
+
+before_install:
+  - curl https://glide.sh/get | sh
+  - go get github.com/mattn/goveralls
+install:
+  - glide install -v
+script:
+  - $HOME/gopath/bin/goveralls -service=travis-ci

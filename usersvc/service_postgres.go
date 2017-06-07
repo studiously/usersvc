@@ -152,6 +152,20 @@ func (s *postgresService) DeleteUser(ctx context.Context) error {
 	return u.Save(s)
 }
 
+func (s *postgresService) ResetPassword(ctx context.Context, email string) error {
+	//u, err := models.UserByEmail(s, email)
+	//switch err {
+	//case nil:
+	//	break
+	//case sql.ErrNoRows:
+	//	return nil
+	//default:
+	//	return err
+	//}
+	panic("unimplemented")
+	return nil
+}
+
 func subj(ctx context.Context) uuid.UUID {
 	return ctx.Value(introspector.SubjectContextKey).(uuid.UUID)
 }

@@ -41,6 +41,7 @@ import (
 	"github.com/studiously/classsvc/classsvc"
 	"github.com/studiously/usersvc/ddl"
 	"github.com/studiously/usersvc/usersvc"
+	"github.com/studiously/usersvc/middleware"
 )
 
 var (
@@ -155,8 +156,8 @@ A NATS cluster is required for messaging across services. Without it, stale data
 		var service usersvc.Service
 		{
 			service = usersvc.New(db, cs)
-			service = usersvc.LoggingMiddleware(logger)(service)
-			service = usersvc.InstrumentingMiddleware(requestCount, requestLatency)(service)
+			service = middleware.Logging(logger)(service)
+			service = middleware.Instrumenting(requestCount, requestLatency)(service)
 		}
 
 		errs := make(chan error)
